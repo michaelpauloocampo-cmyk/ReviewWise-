@@ -4,7 +4,7 @@
    REVIEWWISE CONFIGURATION
 ========================================================= */
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = "https://reviewwise.onrender.com/";
 
 const REQUEST_TIMEOUT_MS = 45000;
 
