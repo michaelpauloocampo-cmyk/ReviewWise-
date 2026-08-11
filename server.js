@@ -1,48 +1,32 @@
 "use strict";
 
-"use strict";
-
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
+const ffmpegPath = require("ffmpeg-static");
 const vision = require("@google-cloud/vision");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
-const speech = require("@google-cloud/speech");
 
 const app = express();
 
-const PORT =
-    Number(
-        process.env.PORT
-    ) || 3000;
+const PORT = Number(process.env.PORT) || 3000;
+
+
 /* =========================================================
    DIRECTORIES
+   Works on Render, localhost, Windows, Linux and Termux.
 ========================================================= */
 
-const HOME_DIR =
-    process.env.HOME ||
-    process.cwd();
+const BASE_DIR = __dirname;
 
-
-const REVIEWWISE_DIR =
-    path.join(
-        HOME_DIR,
-        "storage",
-        "shared",
-        "ReviewWise"
-    );
-
-
-const uploadsDir =
-    path.join(
-        REVIEWWISE_DIR,
-        "uploads"
-    );
-
+const uploadsDir = path.join(
+    BASE_DIR,
+    "uploads"
+);
 
 fs.mkdirSync(
     uploadsDir,
@@ -51,44 +35,55 @@ fs.mkdirSync(
     }
 );
 
-
-console.log(
-    "================================="
-);
-
-console.log(
-    "ReviewWise directory:"
-);
-
-console.log(
-    REVIEWWISE_DIR
-);
-
-console.log(
-    "Uploads directory:"
-);
-
-console.log(
-    uploadsDir
-);
-
-console.log(
-    "================================="
-);
+console.log("=================================");
+console.log("ReviewWise server starting...");
+console.log("Base directory:", BASE_DIR);
+console.log("Uploads directory:", uploadsDir);
+console.log("=================================");
 
 
 /* =========================================================
    GOOGLE CLOUD VISION
 ========================================================= */
 
-let visionClient =
-    null;
-
+let visionClient = null;
 
 try {
 
-    visionClient =
-        new vision.ImageAnnotatorClient();
+    if (
+        process.env.GOOGLE_CREDENTIALS_JSON
+    ) {
+
+        const credentials =
+            JSON.parse(
+                process.env.GOOGLE_CREDENTIALS_JSON
+            );
+
+        visionClient =
+            new vision.ImageAnnotatorClient({
+
+                credentials: {
+
+                    client_email:
+                        credentials.client_email,
+
+                    private_key:
+                        credentials.private_key
+                            .replace(
+                                /\\n/g,
+                                "\n"
+                            )
+                },
+
+                projectId:
+                    credentials.project_id
+            });
+
+    } else {
+
+        visionClient =
+            new vision.ImageAnnotatorClient();
+    }
 
     console.log(
         "Google Cloud Vision client initialized."
@@ -97,11 +92,12 @@ try {
 } catch (error) {
 
     console.error(
-        "Google Vision initialization failed:"
+        "Google Vision initialization failed:",
+        error.message
     );
 
     console.error(
-        error.message
+        "OCR will fail until Google credentials are configured."
     );
 }
 
@@ -114,13 +110,11 @@ app.use(
     cors()
 );
 
-
 app.use(
     express.json({
         limit: "10mb"
     })
 );
-
 
 app.use(
     express.urlencoded({
@@ -134,14 +128,8 @@ app.use(
    FFMPEG
 ========================================================= */
 
-const ffmpegPath =
-    "/data/data/com.termux/files/usr/bin/ffmpeg";
-
-
 if (
-    fs.existsSync(
-        ffmpegPath
-    )
+    ffmpegPath
 ) {
 
     ffmpeg.setFfmpegPath(
@@ -155,16 +143,8 @@ if (
 
 } else {
 
-    console.log(
-        "WARNING: FFmpeg not found."
-    );
-
-    console.log(
-        "Install it using:"
-    );
-
-    console.log(
-        "pkg install ffmpeg"
+    console.warn(
+        "WARNING: ffmpeg-static could not provide FFmpeg."
     );
 }
 
@@ -264,14 +244,24 @@ const videoUpload =
 
 
 const allowedFileExtensions =
-    [".pdf", ".docx", ".txt"];
+    [
+        ".pdf",
+        ".docx",
+        ".txt"
+    ];
+
 
 const allowedFileMimeTypes =
     [
         "application/pdf",
+
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "text/plain"
+
+        "text/plain",
+
+        "application/octet-stream"
     ];
+
 
 const fileUpload =
     multer({
@@ -296,22 +286,28 @@ const fileUpload =
 
                 const ext =
                     path.extname(
-                        file.originalname || ""
+                        file.originalname ||
+                        ""
                     ).toLowerCase();
+
 
                 const mimeOk =
                     allowedFileMimeTypes.includes(
                         file.mimetype
-                    ) ||
-                    file.mimetype ===
-                        "application/octet-stream";
+                    );
+
 
                 if (
-                    allowedFileExtensions.includes(ext) &&
+                    allowedFileExtensions.includes(
+                        ext
+                    ) &&
                     mimeOk
                 ) {
 
-                    cb(null, true);
+                    cb(
+                        null,
+                        true
+                    );
 
                 } else {
 
@@ -334,9 +330,13 @@ const wordCategories = {
     clickbait: [
 
         "shocking",
+
         "breaking",
+
         "viral",
+
         "click here",
+
         "share this"
 
     ],
@@ -344,8 +344,11 @@ const wordCategories = {
     misleading: [
 
         "guaranteed",
+
         "101%",
+
         "unbelievable",
+
         "secret"
 
     ]
@@ -376,13 +379,33 @@ function safeDelete(
     if (
         !filePath
     ) {
+
         return;
     }
 
-    fs.unlink(
-        filePath,
-        () => {}
-    );
+
+    try {
+
+        if (
+            fs.existsSync(
+                filePath
+            )
+        ) {
+
+            fs.unlinkSync(
+                filePath
+            );
+        }
+
+    } catch (
+        error
+    ) {
+
+        console.warn(
+            "Could not delete file:",
+            filePath
+        );
+    }
 }
 
 
@@ -472,6 +495,7 @@ function findPhraseMatches(
             if (
                 !target
             ) {
+
                 return;
             }
 
@@ -558,6 +582,7 @@ function analyzeText(
             credibility -=
                 5;
 
+
             explanation.push({
 
                 type:
@@ -572,7 +597,7 @@ function analyzeText(
 
 
     /* =====================================================
-       MISLEADING / ABSOLUTE CLAIMS
+       MISLEADING
     ====================================================== */
 
     misleadingMatches.forEach(
@@ -580,6 +605,7 @@ function analyzeText(
 
             credibility -=
                 5;
+
 
             explanation.push({
 
@@ -611,7 +637,7 @@ function analyzeText(
         3
     ) {
 
-        credibility -=
+        const penalty =
             Math.min(
                 8,
                 Math.floor(
@@ -619,6 +645,10 @@ function analyzeText(
                     2
                 )
             );
+
+
+        credibility -=
+            penalty;
 
 
         explanation.push({
@@ -638,11 +668,9 @@ function analyzeText(
     ====================================================== */
 
     const capsWords =
-        (
-            text.match(
-                /\b[A-Z]{3,}\b/g
-            ) || []
-        );
+        text.match(
+            /\b[A-Z]{3,}\b/g
+        ) || [];
 
 
     if (
@@ -650,7 +678,7 @@ function analyzeText(
         3
     ) {
 
-        credibility -=
+        const penalty =
             Math.min(
                 8,
                 Math.floor(
@@ -658,6 +686,10 @@ function analyzeText(
                     2
                 )
             );
+
+
+        credibility -=
+            penalty;
 
 
         explanation.push({
@@ -679,12 +711,19 @@ function analyzeText(
     const emotionalTerms = [
 
         "urgent",
+
         "must see",
+
         "act now",
+
         "don't miss",
+
         "hurry",
+
         "everyone needs to know",
+
         "share immediately",
+
         "right now"
 
     ];
@@ -698,8 +737,8 @@ function analyzeText(
 
 
     if (
-        emotionalMatches.length
-        > 0
+        emotionalMatches.length >
+        0
     ) {
 
         credibility -=
@@ -723,7 +762,7 @@ function analyzeText(
 
 
     /* =====================================================
-       CLAMP SCORE
+       CLAMP
     ====================================================== */
 
     credibility =
@@ -731,13 +770,15 @@ function analyzeText(
             0,
             Math.min(
                 100,
-                credibility
+                Math.round(
+                    credibility
+                )
             )
         );
 
 
     /* =====================================================
-       SCORE CATEGORY
+       STATUS
     ====================================================== */
 
     let status =
@@ -753,10 +794,8 @@ function analyzeText(
 
         status =
             "MODERATE CREDIBILITY";
-    }
 
-
-    if (
+    } else if (
         credibility <
         50
     ) {
@@ -766,37 +805,9 @@ function analyzeText(
     }
 
 
-    /* =====================================================
-       RISK
-    ====================================================== */
-
     const suspicious =
         100 -
         credibility;
-
-
-    /* =====================================================
-       BREAKDOWN
-    ====================================================== */
-
-    const clickbait =
-        clickbaitMatches.length;
-
-
-    const misleading =
-        misleadingMatches.length;
-
-
-    const punctuation =
-        exclamationCount;
-
-
-    const capitalization =
-        capsWords.length;
-
-
-    const emotional =
-        emotionalMatches.length;
 
 
     /* =====================================================
@@ -829,15 +840,20 @@ function analyzeText(
         suspiciousCount:
             suspiciousMatches.length,
 
-        clickbait,
+        clickbait:
+            clickbaitMatches.length,
 
-        misleading,
+        misleading:
+            misleadingMatches.length,
 
-        punctuation,
+        punctuation:
+            exclamationCount,
 
-        capitalization,
+        capitalization:
+            capsWords.length,
 
-        emotional,
+        emotional:
+            emotionalMatches.length,
 
         status,
 
@@ -895,19 +911,27 @@ function getHighlightedWordsFromText(
                             text:
                                 match[0],
 
-                            category
+                            category,
+
+                            index:
+                                match.index
 
                         });
+
+
+                        if (
+                            match[0] ===
+                            ""
+                        ) {
+
+                            regex.lastIndex++;
+                        }
                     }
                 }
             );
         }
     );
 
-
-    /*
-     * Remove duplicate positions.
-     */
 
     const seen =
         new Set();
@@ -917,7 +941,7 @@ function getHighlightedWordsFromText(
         item => {
 
             const key =
-                `${item.text.toLowerCase()}_${item.category}`;
+                `${item.index}_${item.text.toLowerCase()}_${item.category}`;
 
 
             if (
@@ -954,7 +978,9 @@ function categorizeWord(
             word ||
             ""
         )
+
             .toLowerCase()
+
             .replace(
                 /[^a-z0-9%]/g,
                 ""
@@ -986,7 +1012,9 @@ function categorizeWord(
 
             const target =
                 suspiciousWord
+
                     .toLowerCase()
+
                     .replace(
                         /[^a-z0-9%]/g,
                         ""
@@ -995,10 +1023,12 @@ function categorizeWord(
 
             if (
                 normalized ===
-                    target ||
+                target ||
+
                 normalized.includes(
                     target
                 ) ||
+
                 target.includes(
                     normalized
                 )
@@ -1015,12 +1045,7 @@ function categorizeWord(
 
 
 /* =========================================================
-   OCR QUALITY SCORING (SERVER)
-   =========================================================
-   Mirrors the client-side scorer: blends engine confidence
-   with text-shape heuristics so "confidence" reflects how
-   trustworthy the text actually looks, not just whatever
-   number the OCR engine reports.
+   OCR QUALITY
 ========================================================= */
 
 function computeServerOcrQuality(
@@ -1029,169 +1054,433 @@ function computeServerOcrQuality(
 ) {
 
     const clean =
-        String(text || "").trim();
+        String(
+            text ||
+            ""
+        ).trim();
 
-    if (!clean) {
+
+    if (
+        !clean
+    ) {
 
         return {
-            score: 0,
-            label: "Poor"
+
+            score:
+                0,
+
+            label:
+                "Poor"
         };
     }
 
+
     const letters =
-        (clean.match(/[A-Za-z]/g) || []).length;
+        (
+            clean.match(
+                /[A-Za-z]/g
+            ) || []
+        ).length;
+
 
     const digits =
-        (clean.match(/[0-9]/g) || []).length;
+        (
+            clean.match(
+                /[0-9]/g
+            ) || []
+        ).length;
+
 
     const total =
         clean.length;
 
+
     const alphaRatio =
-        total > 0 ? (letters + digits) / total : 0;
+        total > 0
+            ? (
+                letters +
+                digits
+            ) /
+            total
+            : 0;
+
 
     const weirdSymbols =
-        (clean.match(/[^\w\s.,!?;:'"()\-%$@#&/]/g) || []).length;
+        (
+            clean.match(
+                /[^\w\s.,!?;:'"()\-%$@#&/]/g
+            ) || []
+        ).length;
+
 
     const weirdRatio =
-        total > 0 ? weirdSymbols / total : 0;
+        total > 0
+            ? weirdSymbols /
+              total
+            : 0;
+
 
     const words =
-        clean.split(/\s+/).filter(Boolean);
+        clean
+            .split(
+                /\s+/
+            )
+            .filter(
+                Boolean
+            );
+
 
     const dictionaryLikeWords =
         words.filter(
-            w => /^[A-Za-z][A-Za-z'-]{1,}$/.test(w)
+            word =>
+                /^[A-Za-z][A-Za-z'-]{1,}$/
+                    .test(
+                        word
+                    )
         ).length;
+
 
     const wordValidityRatio =
         words.length > 0
-            ? dictionaryLikeWords / words.length
+            ? dictionaryLikeWords /
+              words.length
             : 0;
 
+
     const confidence =
-        Number.isFinite(engineConfidence)
-            ? Math.max(0, Math.min(100, engineConfidence))
+        Number.isFinite(
+            engineConfidence
+        )
+
+            ? Math.max(
+                0,
+                Math.min(
+                    100,
+                    engineConfidence
+                )
+            )
+
             : 55;
 
-    let score =
-        (confidence * 0.45) +
-        (alphaRatio * 100 * 0.25) +
-        (wordValidityRatio * 100 * 0.2) +
-        (Math.max(0, 1 - weirdRatio * 4) * 100 * 0.1);
 
-    if (total < 8) {
-        score -= 15;
+    let score =
+        confidence *
+        0.45 +
+
+        alphaRatio *
+        100 *
+        0.25 +
+
+        wordValidityRatio *
+        100 *
+        0.2 +
+
+        Math.max(
+            0,
+            1 -
+            weirdRatio *
+            4
+        ) *
+        100 *
+        0.1;
+
+
+    if (
+        total <
+        8
+    ) {
+
+        score -=
+            15;
     }
 
-    score = Math.max(0, Math.min(100, Math.round(score)));
 
-    let label = "Poor";
+    score =
+        Math.max(
+            0,
+            Math.min(
+                100,
+                Math.round(
+                    score
+                )
+            )
+        );
 
-    if (score >= 85) label = "Excellent";
-    else if (score >= 70) label = "Good";
-    else if (score >= 45) label = "Fair";
 
-    return { score, label };
+    let label =
+        "Poor";
+
+
+    if (
+        score >=
+        85
+    ) {
+
+        label =
+            "Excellent";
+
+    } else if (
+        score >=
+        70
+    ) {
+
+        label =
+            "Good";
+
+    } else if (
+        score >=
+        45
+    ) {
+
+        label =
+            "Fair";
+    }
+
+
+    return {
+
+        score,
+
+        label
+
+    };
 }
 
 
 /* =========================================================
-   RUN VISION ON A SINGLE IMAGE FILE
+   GOOGLE VISION OCR
 ========================================================= */
 
 async function runVisionOnFile(
     filePath
 ) {
 
-    const [result] =
-        await visionClient.documentTextDetection(filePath);
+    if (
+        !visionClient
+    ) {
 
-    if (result.error && result.error.message) {
-        throw new Error(result.error.message);
+        throw new Error(
+            "Google Cloud Vision is not configured. Add GOOGLE_CREDENTIALS_JSON or GOOGLE_APPLICATION_CREDENTIALS."
+        );
     }
+
+
+    const [
+        result
+    ] =
+        await visionClient
+            .documentTextDetection({
+
+                image: {
+
+                    source: {
+
+                        filename:
+                            filePath
+
+                    }
+                }
+            });
+
+
+    if (
+        result.error &&
+        result.error.message
+    ) {
+
+        throw new Error(
+            result.error.message
+        );
+    }
+
 
     const fullText =
         result.fullTextAnnotation;
 
+
     const rawText =
-        fullText?.text || "";
+        fullText?.text ||
+        "";
 
-    const highlightedWords = [];
 
-    let totalConfidence = 0;
-    let confidenceCount = 0;
+    const highlightedWords =
+        [];
 
-    const pages = fullText?.pages || [];
+
+    let totalConfidence =
+        0;
+
+
+    let confidenceCount =
+        0;
+
+
+    const pages =
+        fullText?.pages ||
+        [];
+
 
     pages.forEach(
         page => {
 
-            if (typeof page.confidence === "number") {
-                totalConfidence += page.confidence;
+            if (
+                typeof page.confidence ===
+                "number"
+            ) {
+
+                totalConfidence +=
+                    page.confidence;
+
                 confidenceCount++;
             }
 
-            (page.blocks || []).forEach(
+
+            (
+                page.blocks ||
+                []
+            ).forEach(
                 block => {
 
-                    (block.paragraphs || []).forEach(
+                    (
+                        block.paragraphs ||
+                        []
+                    ).forEach(
                         paragraph => {
 
-                            (paragraph.words || []).forEach(
+                            (
+                                paragraph.words ||
+                                []
+                            ).forEach(
                                 word => {
 
-                                    let wordText = "";
+                                    let wordText =
+                                        "";
 
-                                    (word.symbols || []).forEach(
+
+                                    (
+                                        word.symbols ||
+                                        []
+                                    ).forEach(
                                         symbol => {
-                                            wordText += symbol.text || "";
+
+                                            wordText +=
+                                                symbol.text ||
+                                                "";
                                         }
                                     );
 
-                                    wordText = wordText.trim();
 
-                                    if (!wordText) return;
+                                    wordText =
+                                        wordText.trim();
 
-                                    if (typeof word.confidence === "number") {
-                                        totalConfidence += word.confidence;
-                                        confidenceCount++;
-                                    }
 
-                                    const category =
-                                        categorizeWord(wordText);
+                                    if (
+                                        !wordText
+                                    ) {
 
-                                    if (!category) return;
-
-                                    const vertices =
-                                        word.boundingBox?.vertices || [];
-
-                                    const xs =
-                                        vertices.map(v => Number(v.x || 0));
-
-                                    const ys =
-                                        vertices.map(v => Number(v.y || 0));
-
-                                    if (xs.length === 0 || ys.length === 0) {
                                         return;
                                     }
 
+
+                                    if (
+                                        typeof word.confidence ===
+                                        "number"
+                                    ) {
+
+                                        totalConfidence +=
+                                            word.confidence;
+
+                                        confidenceCount++;
+                                    }
+
+
+                                    const category =
+                                        categorizeWord(
+                                            wordText
+                                        );
+
+
+                                    if (
+                                        !category
+                                    ) {
+
+                                        return;
+                                    }
+
+
+                                    const vertices =
+                                        word
+                                            .boundingBox
+                                            ?.vertices ||
+                                        [];
+
+
+                                    if (
+                                        vertices.length ===
+                                        0
+                                    ) {
+
+                                        return;
+                                    }
+
+
+                                    const xs =
+                                        vertices.map(
+                                            vertex =>
+                                                Number(
+                                                    vertex.x ||
+                                                    0
+                                                )
+                                        );
+
+
+                                    const ys =
+                                        vertices.map(
+                                            vertex =>
+                                                Number(
+                                                    vertex.y ||
+                                                    0
+                                                )
+                                        );
+
+
                                     highlightedWords.push({
 
-                                        text: wordText,
+                                        text:
+                                            wordText,
+
                                         category,
 
                                         confidence:
                                             Math.round(
-                                                Number(word.confidence || 0) * 100
+                                                Number(
+                                                    word.confidence ||
+                                                    0
+                                                ) *
+                                                100
                                             ),
 
                                         bbox: {
-                                            x0: Math.min(...xs),
-                                            y0: Math.min(...ys),
-                                            x1: Math.max(...xs),
-                                            y1: Math.max(...ys)
+
+                                            x0:
+                                                Math.min(
+                                                    ...xs
+                                                ),
+
+                                            y0:
+                                                Math.min(
+                                                    ...ys
+                                                ),
+
+                                            x1:
+                                                Math.max(
+                                                    ...xs
+                                                ),
+
+                                            y1:
+                                                Math.max(
+                                                    ...ys
+                                                )
                                         }
                                     });
                                 }
@@ -1203,48 +1492,43 @@ async function runVisionOnFile(
         }
     );
 
+
     const ocrConfidence =
-        confidenceCount > 0
-            ? Math.round((totalConfidence / confidenceCount) * 100)
+        confidenceCount >
+        0
+
+            ? Math.round(
+                (
+                    totalConfidence /
+                    confidenceCount
+                ) *
+                100
+            )
+
             : 0;
 
-    return { rawText, highlightedWords, ocrConfidence };
+
+    return {
+
+        rawText,
+
+        highlightedWords,
+
+        ocrConfidence
+
+    };
 }
 
-
-/* =========================================================
-   GOOGLE VISION OCR — MULTI-PASS
-   =========================================================
-   Builds several preprocessing variants of the uploaded
-   image (never touching the original file), runs OCR on
-   each, and keeps the variant with the best computed OCR
-   quality score instead of blindly using the first pass.
-========================================================= */
-
-/* =========================================================
-   GOOGLE VISION OCR
-   TERMUX / ANDROID SAFE VERSION
-   =========================================================
-   This version intentionally does NOT use Sharp.
-   Google Vision processes the original uploaded image
-   directly, avoiding native libvips/sharp problems on
-   Android ARM64 / Termux.
-========================================================= */
 
 async function performGoogleOCR(
     imagePath
 ) {
 
-    if (!visionClient) {
-
-        throw new Error(
-            "Google Cloud Vision is not initialized. Check your Google credentials."
-        );
-    }
-
     if (
         !imagePath ||
-        !fs.existsSync(imagePath)
+        !fs.existsSync(
+            imagePath
+        )
     ) {
 
         throw new Error(
@@ -1252,28 +1536,35 @@ async function performGoogleOCR(
         );
     }
 
+
     try {
 
         console.log(
             "Running Google Vision OCR..."
         );
 
+
         const ocrResult =
             await runVisionOnFile(
                 imagePath
             );
+
 
         const cleanedText =
             cleanText(
                 ocrResult.rawText
             );
 
-        if (!cleanedText) {
+
+        if (
+            !cleanedText
+        ) {
 
             throw new Error(
                 "Unable to read text from this image. Try using a clearer or brighter photo."
             );
         }
+
 
         const quality =
             computeServerOcrQuality(
@@ -1281,13 +1572,16 @@ async function performGoogleOCR(
                 ocrResult.ocrConfidence
             );
 
+
         console.log(
             `OCR confidence: ${ocrResult.ocrConfidence}%`
         );
 
+
         console.log(
             `OCR quality: ${quality.score}% (${quality.label})`
         );
+
 
         return {
 
@@ -1320,12 +1614,18 @@ async function performGoogleOCR(
             error.message
         );
 
+
         throw new Error(
             error.message ||
             "Unable to process the image."
         );
     }
 }
+
+
+/* =========================================================
+   TEXT API
+========================================================= */
 
 app.post(
     "/analyze",
@@ -1364,25 +1664,21 @@ app.post(
                 );
 
 
-            const highlightedWords =
-                getHighlightedWordsFromText(
-                    text
-                );
-
-
             res.json({
 
                 ...analysis,
 
                 text,
 
-                highlightedWords,
+                highlightedWords:
+                    getHighlightedWordsFromText(
+                        text
+                    ),
 
                 contentType:
                     "text"
 
             });
-
 
         } catch (
             error
@@ -1450,65 +1746,65 @@ app.post(
                 ocr.text;
 
 
-            if (
-                !extractedText
-            ) {
-
-                throw new Error(
-                    "Unable to read text from this image. Try using a clearer or brighter photo."
-                );
-            }
-
-
             const analysis =
                 analyzeText(
                     extractedText
                 );
 
 
-            /*
-             * OCR REQUIREMENT (#7):
-             * Don't let a low-confidence OCR read produce a
-             * falsely confident credibility verdict — dampen
-             * the score toward neutral and flag it clearly
-             * when OCR quality is low, instead of applying
-             * suspicious-word penalties at full strength.
-             */
-
             let credibility =
                 analysis.credibility;
+
 
             let ocrLowConfidence =
                 false;
 
+
             if (
-                Number.isFinite(ocr.ocrQuality) &&
-                ocr.ocrQuality < 60
+                Number.isFinite(
+                    ocr.ocrQuality
+                ) &&
+                ocr.ocrQuality <
+                60
             ) {
 
                 const weight =
-                    Math.max(0.35, ocr.ocrQuality / 60);
+                    Math.max(
+                        0.35,
+                        ocr.ocrQuality /
+                        60
+                    );
+
 
                 credibility =
                     Math.round(
-                        analysis.credibility * weight +
-                        75 * (1 - weight)
+
+                        analysis.credibility *
+                        weight +
+
+                        75 *
+                        (
+                            1 -
+                            weight
+                        )
                     );
 
-                ocrLowConfidence = true;
+
+                ocrLowConfidence =
+                    true;
             }
-
-
-            const textHighlights =
-                getHighlightedWordsFromText(
-                    extractedText
-                );
 
 
             const merged =
                 [
                     ...ocr.highlightedWords
                 ];
+
+
+            const textHighlights =
+                getHighlightedWordsFromText(
+                    extractedText
+                );
 
 
             textHighlights.forEach(
@@ -1536,11 +1832,6 @@ app.post(
             );
 
 
-            safeDelete(
-                req.file.path
-            );
-
-
             res.json({
 
                 ...analysis,
@@ -1548,7 +1839,8 @@ app.post(
                 credibility,
 
                 suspicious:
-                    100 - credibility,
+                    100 -
+                    credibility,
 
                 text:
                     extractedText,
@@ -1575,7 +1867,6 @@ app.post(
 
             });
 
-
         } catch (
             error
         ) {
@@ -1583,11 +1874,6 @@ app.post(
             console.error(
                 "IMAGE OCR ERROR:",
                 error
-            );
-
-
-            safeDelete(
-                req.file.path
             );
 
 
@@ -1600,6 +1886,12 @@ app.post(
                     "Unable to process the image."
 
             });
+
+        } finally {
+
+            safeDelete(
+                req.file.path
+            );
         }
     }
 );
@@ -1662,10 +1954,12 @@ function normalizeVideoLine(
     return normalizeText(
         line
     )
+
         .replace(
             /[^a-z0-9%!?.,:'"-]+/g,
             " "
         )
+
         .trim();
 }
 
@@ -1711,13 +2005,11 @@ app.post(
         try {
 
             if (
-                !fs.existsSync(
-                    ffmpegPath
-                )
+                !ffmpegPath
             ) {
 
                 throw new Error(
-                    "FFmpeg is not installed. Run: pkg install ffmpeg"
+                    "FFmpeg is unavailable on this server."
                 );
             }
 
@@ -1731,11 +2023,6 @@ app.post(
             );
 
 
-            /*
-             * Extract only 6 frames.
-             * This avoids processing every frame.
-             */
-
             await extractVideoFrames(
                 req.file.path,
                 framesDir
@@ -1743,9 +2030,11 @@ app.post(
 
 
             const frameFiles =
-                fs.readdirSync(
-                    framesDir
-                )
+                fs
+
+                    .readdirSync(
+                        framesDir
+                    )
 
                     .filter(
                         file =>
@@ -1769,18 +2058,16 @@ app.post(
             }
 
 
-            let lines = [];
+            const lines = [];
+
 
             let confidenceTotal =
                 0;
 
+
             let confidenceCount =
                 0;
 
-
-            /* =================================================
-               OCR EACH SELECTED FRAME
-            ================================================== */
 
             for (
                 let i = 0;
@@ -1809,12 +2096,15 @@ app.post(
 
                         const frameLines =
                             ocr.text
+
                                 .split(
                                     /\n+/
                                 )
+
                                 .map(
                                     normalizeVideoLine
                                 )
+
                                 .filter(
                                     Boolean
                                 );
@@ -1838,7 +2128,6 @@ app.post(
                         confidenceCount++;
                     }
 
-
                 } catch (
                     error
                 ) {
@@ -1850,10 +2139,6 @@ app.post(
                 }
             }
 
-
-            /* =================================================
-               REMOVE DUPLICATE OCR TEXT
-            ================================================== */
 
             const uniqueLines =
                 [];
@@ -1875,16 +2160,12 @@ app.post(
                     if (
                         !key ||
                         key.length <
-                            2
+                        2
                     ) {
 
                         return;
                     }
 
-
-                    /*
-                     * Remove exact duplicates.
-                     */
 
                     if (
                         seen.has(
@@ -1896,26 +2177,19 @@ app.post(
                     }
 
 
-                    /*
-                     * Also ignore near-duplicates when one
-                     * OCR line is contained in another.
-                     */
-
                     const nearDuplicate =
                         uniqueLines.some(
-                            existing => {
+                            existing =>
+                                existing ===
+                                key ||
 
-                                return (
-                                    existing ===
-                                        key ||
-                                    existing.includes(
-                                        key
-                                    ) ||
-                                    key.includes(
-                                        existing
-                                    )
-                                );
-                            }
+                                existing.includes(
+                                    key
+                                ) ||
+
+                                key.includes(
+                                    existing
+                                )
                         );
 
 
@@ -1930,6 +2204,7 @@ app.post(
                     seen.add(
                         key
                     );
+
 
                     uniqueLines.push(
                         key
@@ -1956,34 +2231,23 @@ app.post(
             }
 
 
-            /* =================================================
-               ANALYZE
-            ================================================== */
-
             const analysis =
                 analyzeText(
                     combinedText
                 );
 
 
-            const highlightedWords =
-                getHighlightedWordsFromText(
-                    combinedText
-                );
-
-
             const averageConfidence =
-                confidenceCount > 0
+                confidenceCount >
+                0
+
                     ? Math.round(
                         confidenceTotal /
                         confidenceCount
                     )
+
                     : 0;
 
-
-            /* =================================================
-               RESPONSE
-            ================================================== */
 
             res.json({
 
@@ -1992,7 +2256,10 @@ app.post(
                 text:
                     combinedText,
 
-                highlightedWords,
+                highlightedWords:
+                    getHighlightedWordsFromText(
+                        combinedText
+                    ),
 
                 ocrConfidence:
                     averageConfidence,
@@ -2004,7 +2271,6 @@ app.post(
                     "video"
 
             });
-
 
         } catch (
             error
@@ -2025,7 +2291,6 @@ app.post(
                     "Unable to process the video."
 
             });
-
 
         } finally {
 
@@ -2083,7 +2348,8 @@ app.post(
 
         const ext =
             path.extname(
-                req.file.originalname
+                req.file.originalname ||
+                ""
             ).toLowerCase();
 
 
@@ -2091,10 +2357,6 @@ app.post(
 
             let extractedText =
                 "";
-
-
-            let ocrConfidence =
-                null;
 
 
             /* =================================================
@@ -2199,12 +2461,6 @@ app.post(
                 );
 
 
-            const highlightedWords =
-                getHighlightedWordsFromText(
-                    extractedText
-                );
-
-
             res.json({
 
                 ...analysis,
@@ -2212,19 +2468,15 @@ app.post(
                 text:
                     extractedText,
 
-                highlightedWords,
+                highlightedWords:
+                    getHighlightedWordsFromText(
+                        extractedText
+                    ),
 
                 contentType:
-                    "file",
-
-                ...(ocrConfidence !== null
-                    ? {
-                        ocrConfidence
-                    }
-                    : {})
+                    "file"
 
             });
-
 
         } catch (
             error
@@ -2246,13 +2498,49 @@ app.post(
 
             });
 
-
         } finally {
 
             safeDelete(
                 req.file.path
             );
         }
+    }
+);
+
+
+/* =========================================================
+   HEALTH CHECK
+========================================================= */
+
+app.get(
+    "/health",
+    (
+        req,
+        res
+    ) => {
+
+        res.json({
+
+            status:
+                "ok",
+
+            service:
+                "ReviewWise",
+
+            timestamp:
+                new Date().toISOString(),
+
+            visionConfigured:
+                Boolean(
+                    visionClient
+                ),
+
+            ffmpegConfigured:
+                Boolean(
+                    ffmpegPath
+                )
+
+        });
     }
 );
 
@@ -2346,12 +2634,12 @@ app.use(
 
 
 /* =========================================================
-   SERVE WEBSITE
+   SERVE FRONTEND
 ========================================================= */
 
 app.use(
     express.static(
-        __dirname
+        BASE_DIR
     )
 );
 
@@ -2374,7 +2662,11 @@ app.listen(
         );
 
         console.log(
-            `http://localhost:${PORT}`
+            `Port: ${PORT}`
+        );
+
+        console.log(
+            `Local: http://localhost:${PORT}`
         );
 
         console.log(
