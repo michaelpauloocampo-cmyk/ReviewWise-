@@ -1,0 +1,966 @@
+<!DOCTYPE html>  <html lang="en"> 
+<head>    <meta charset="UTF-8">    
+<meta name="viewport"    
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover">  <meta name="theme-color" content="#2563eb">
+
+<title>ReviewWise AI Credibility Checker</title>    <link rel="icon" type="image/png" href="logo.png">    
+<link rel="stylesheet" href="styles.css">  </head>  <body>  <div id="loadingScreen">    <img src="logo.png" alt="ReviewWise Logo">    
+
+<h2>REVIEWWISE</h2>    
+
+<p>AI Credibility Checker</p>    
+
+<div class="loader"></div>
+
+</div>    <!-- =====================================================    
+     HAMBURGER    
+====================================================== -->    <button    
+class="hamburger"    
+onclick="toggleSidebar()"    
+aria-label="Open navigation">
+
+<span></span>    
+<span></span>    
+<span></span>
+
+</button>    <div    
+    id="sidebarOverlay"    
+    class="hidden"    
+    onclick="toggleSidebar()">    
+</div>    <!-- =====================================================    
+     SIDEBAR    
+====================================================== -->    <aside id="sidebar">    <div class="sidebar-header">    
+
+    <img    
+        src="logo.png"    
+        alt="ReviewWise Logo"    
+        class="reviewwise-logo">    
+
+    <div>    
+        <h2>ReviewWise</h2>    
+        <small>Credibility Checker</small>    
+    </div>    
+
+</div>    
+
+<button onclick="goHome()">    
+    <span>Home</span>    
+</button>    
+
+<button onclick="openHistory()">    
+    <span>History</span>    
+</button>    
+
+<button onclick="openAbout()">    
+    <span>About</span>    
+</button>    
+
+<button onclick="clearHistory()">    
+    <span>Clear History</span>    
+</button>
+
+</aside>    <!-- =====================================================    
+     HISTORY    
+====================================================== -->    <section id="historyPanel" class="hidden">    <div class="panel-header">    
+
+    <div>    
+        <span class="panel-eyebrow">    
+            ReviewWise    
+        </span>    
+
+        <h2>Check History</h2>    
+    </div>    
+
+    <button    
+        class="close-btn"    
+        onclick="closePanels()"    
+        aria-label="Close">    
+        ×    
+    </button>    
+
+</div>    
+
+<div id="historyList"></div>
+
+</section>    <!-- =====================================================    
+     ABOUT    
+====================================================== -->    <section id="aboutPanel" class="hidden">    <div class="panel-header">    
+
+    <div>    
+        <span class="panel-eyebrow">    
+            About    
+        </span>    
+
+        <h2>About ReviewWise</h2>    
+    </div>    
+
+    <button    
+        class="close-btn"    
+        onclick="closePanels()"    
+        aria-label="Close">    
+        ×    
+    </button>    
+
+</div>    
+
+<div class="about-content">    
+
+    <div class="about-logo">    
+
+        <img    
+            src="logo.png"    
+            alt="ReviewWise">    
+
+    </div>    
+
+    <p>    
+        <strong>ReviewWise</strong> is an AI-assisted    
+        credibility checking tool designed to identify    
+        language patterns that may indicate clickbait,    
+        exaggerated claims, excessive capitalization,    
+        emotional language, or other suspicious signals.    
+    </p>    
+
+    <div class="info-card">    
+
+        <strong>Important</strong>    
+
+        <p>    
+            The credibility score is a    
+            <strong>risk indicator</strong>.    
+            It does not prove that information is true    
+            or false. Important claims should still be    
+            verified using reliable sources.    
+        </p>    
+
+    </div>    
+
+    <div class="feature-list">    
+
+        <div>    
+            <span>✍️</span>    
+            <span>Text Analysis</span>    
+        </div>    
+
+        <div>    
+            <span>📷</span>    
+            <span>Camera & OCR</span>    
+        </div>    
+
+        <div>    
+            <span>🖼️</span>    
+            <span>Image Analysis</span>    
+        </div>    
+
+        <div>    
+            <span>🎥</span>    
+            <span>Video OCR</span>    
+        </div>    
+
+        <div>    
+            <span>📄</span>    
+            <span>PDF, DOCX & TXT</span>    
+        </div>    
+
+    </div>    
+
+</div>
+
+</section>    <!-- =====================================================    
+     MAIN APPLICATION    
+====================================================== -->    <main class="container">    <div class="hero">    
+
+    <div class="logo-container">    
+
+        <img    
+            src="logo.png"    
+            class="logo"    
+            alt="ReviewWise Logo">    
+
+    </div>    
+
+    <div class="brand-badge">    
+        AI-ASSISTED CREDIBILITY ANALYSIS    
+    </div>    
+
+    <h1>    
+        ReviewWise    
+    </h1>    
+
+    <p class="hero-subtitle">    
+        Check content for suspicious language    
+        and credibility risk indicators.    
+    </p>    
+
+</div>    
+
+
+<!-- =================================================    
+     INPUT CARD    
+================================================== -->    
+
+<section class="input-card">    
+
+    <div class="section-heading">    
+
+        <div>    
+            <span class="section-eyebrow">    
+                CONTENT CHECKER    
+            </span>    
+
+            <h2>    
+                What would you like to check?    
+            </h2>    
+        </div>    
+
+        <span class="input-icon">    
+            ✦    
+        </span>    
+
+    </div>    
+
+    <textarea    
+        id="newsInput"    
+        placeholder="Type or Paste text here."    
+        maxlength="20000"></textarea>    
+
+    <div class="input-footer">    
+
+        <span id="characterCount">    
+            0 characters    
+        </span>    
+
+        <span>    
+            ReviewWise analyzes language patterns    
+        </span>    
+
+    </div>    
+
+    <div class="input-toolbar">
+
+        <div class="counter-group">
+            <span id="wordCount">0 words</span>
+        </div>
+
+        <button
+            type="button"
+            id="micButton"
+            class="mic-button"
+            onclick="toggleSpeechToText()"
+            aria-label="Speech to text">
+            <span id="micIcon">🎤</span>
+            <span id="micLabel">Speak</span>
+        </button>
+
+    </div>    
+
+    <div    
+        id="ocrStatus"    
+        class="status-message hidden">    
+    </div>    
+
+    <button    
+        id="generateButton"    
+        class="generate-button"    
+        onclick="generateResult()">    
+
+        <span>Analyze Content</span>    
+        <span>→</span>    
+
+    </button>    
+
+</section>    
+
+
+<!-- =================================================    
+     IMAGE PREVIEW    
+================================================== -->    
+
+<section    
+    id="imageContainer"    
+    class="preview-card hidden">    
+
+    <div class="preview-header">    
+
+        <div>    
+            <span class="section-eyebrow">    
+                IMAGE    
+            </span>    
+
+            <h3>Uploaded Image</h3>    
+        </div>    
+
+        <button    
+            class="small-action"    
+            onclick="removeCurrentMedia()">    
+            Remove    
+        </button>    
+
+    </div>    
+
+    <div class="image-wrapper">    
+
+        <img    
+            id="previewImage"    
+            alt="Uploaded Image">    
+
+        <canvas    
+            id="highlightCanvas">    
+        </canvas>    
+
+    </div>    
+
+    <div id="imageMeta" class="media-meta hidden"></div>
+
+    <div id="ocrQualityRow" class="ocr-quality-row hidden">
+        <span id="ocrQualityBadge" class="ocr-quality-badge"></span>
+    </div>
+
+    <div id="ocrWarningBanner" class="ocr-warning-banner hidden">
+        <span>⚠</span>
+        <span id="ocrWarningText"></span>
+    </div>
+
+    <div id="ocrReviewCard" class="ocr-review-card hidden">
+
+        <div class="preview-header">
+            <div>
+                <span class="section-eyebrow">EXTRACTED TEXT</span>
+                <h3>Review extracted text</h3>
+            </div>
+        </div>
+
+        <textarea
+            id="ocrReviewText"
+            class="ocr-review-textarea"
+            placeholder="Extracted text will appear here for review."></textarea>
+
+        <div class="ocr-review-actions">
+            <button type="button" class="ocr-action-btn" onclick="copyOcrText()">Copy Text</button>
+            <button type="button" class="ocr-action-btn" onclick="useExtractedText()">Use Extracted Text</button>
+            <button type="button" class="ocr-action-btn primary" onclick="analyzeCorrectedText()">Analyze Corrected Text</button>
+        </div>
+
+    </div>
+
+</section>    
+
+
+<!-- =================================================    
+     VIDEO PREVIEW    
+================================================== -->    
+
+<section    
+    id="videoContainer"    
+    class="preview-card hidden">    
+
+    <div class="preview-header">    
+
+        <div>    
+            <span class="section-eyebrow">    
+                VIDEO    
+            </span>    
+
+            <h3>Uploaded Video</h3>    
+        </div>    
+
+        <button    
+            class="small-action"    
+            onclick="removeCurrentMedia()">    
+            Remove    
+        </button>    
+
+    </div>    
+
+    <div class="video-wrapper">    
+
+        <video    
+            id="previewVideo"    
+            controls    
+            playsinline>    
+        </video>    
+
+    </div>    
+
+    <div    
+        id="videoProgress"    
+        class="progress-area hidden">    
+
+        <div class="progress-label">    
+
+            <span id="videoProgressText">    
+                Scanning video...    
+            </span>    
+
+            <strong id="videoProgressPercent">    
+                0%    
+            </strong>    
+
+        </div>    
+
+        <div class="progress-track">    
+
+            <div    
+                id="videoProgressBar"    
+                class="progress-fill">    
+            </div>    
+
+        </div>    
+
+    </div>    
+
+</section>    
+
+
+<!-- =================================================    
+     FILE PREVIEW    
+================================================== -->    
+
+<section    
+    id="fileContainer"    
+    class="preview-card hidden">    
+
+    <div class="preview-header">    
+
+        <div>    
+            <span class="section-eyebrow">    
+                FILE    
+            </span>    
+
+            <h3>Uploaded File</h3>    
+        </div>    
+
+        <button    
+            class="small-action"    
+            onclick="removeCurrentMedia()">    
+            Remove    
+        </button>    
+
+    </div>    
+
+    <div class="file-wrapper">    
+
+        <div class="file-type-icon">    
+            📄    
+        </div>    
+
+        <div class="file-details">    
+
+            <strong id="fileNamePreview">    
+                File    
+            </strong>    
+
+            <span id="fileTypePreview">    
+                Ready for analysis    
+            </span>    
+
+        </div>    
+
+    </div>    
+
+</section>    
+
+
+<!-- =================================================    
+     RESULT    
+================================================== -->    
+
+<section    
+    id="result"    
+    class="result-section hidden">    
+
+    <div class="result-header">    
+
+        <div>    
+
+            <span class="section-eyebrow">    
+                CREDIBILITY REPORT    
+            </span>    
+
+            <h2>    
+                Analysis Result    
+            </h2>    
+
+        </div>    
+
+        <div    
+            id="resultTypeBadge"    
+            class="result-type-badge">    
+            TEXT    
+        </div>    
+
+    </div>    
+
+
+    <!-- SCORE -->    
+
+    <div class="score-card">    
+
+        <div    
+            class="score-ring"    
+            id="scoreRing">    
+
+            <div class="score-ring-inner">    
+
+                <strong id="scoreNumber">    
+                    0    
+                </strong>    
+
+                <span>    
+                    / 100    
+                </span>    
+
+            </div>    
+
+        </div>    
+
+        <div class="score-information">    
+
+            <span class="score-label">    
+                CREDIBILITY SCORE    
+            </span>    
+
+            <h3 id="scoreLevel">    
+                MODERATE CREDIBILITY    
+            </h3>    
+
+            <p id="scoreDescription">    
+                This score is a risk indicator    
+                based on detected language patterns.    
+            </p>    
+
+        </div>    
+
+    </div>    
+
+
+    <!-- SCORE BAR -->    
+
+    <div class="score-progress">    
+
+        <div class="score-progress-header">    
+
+            <span>    
+                Credibility indicator    
+            </span>    
+
+            <strong id="scoreProgressValue">    
+                0 / 100    
+            </strong>    
+
+        </div>    
+
+        <div class="score-progress-track">    
+
+            <div    
+                id="scoreProgressBar"    
+                class="score-progress-fill">    
+            </div>    
+
+        </div>    
+
+        <div class="score-scale">    
+
+            <span>LOW</span>    
+            <span>MODERATE</span>    
+            <span>HIGH</span>    
+
+        </div>    
+
+    </div>    
+
+
+    <!-- PATTERN BREAKDOWN -->    
+
+    <div class="breakdown-card">    
+
+        <div class="section-heading compact">    
+
+            <div>    
+
+                <span class="section-eyebrow">    
+                    DETECTED PATTERNS    
+                </span>    
+
+                <h3>    
+                    Why was this flagged?    
+                </h3>    
+
+            </div>    
+
+        </div>    
+
+        <div    
+            id="patternBreakdown"    
+            class="pattern-grid">    
+        </div>    
+
+    </div>    
+
+
+    <!-- EXPLANATIONS -->    
+
+    <div class="explanation-card">    
+
+        <div class="explanation-title">    
+
+            <span>⚠️</span>    
+
+            <h3>    
+                Detailed Analysis    
+            </h3>    
+
+        </div>    
+
+        <div    
+            id="detailedExplanations"    
+            class="explanation-list">    
+        </div>    
+
+    </div>    
+
+
+    <!-- GRAPH -->    
+
+    <div class="chart-container">    
+
+        <div class="section-heading compact">    
+
+            <div>    
+
+                <span class="section-eyebrow">    
+                    VISUAL SUMMARY    
+                </span>    
+
+                <h3>    
+                    Credibility vs Not Credible    
+                </h3>    
+
+            </div>    
+
+        </div>    
+
+        <div class="graph-container-vertical">    
+
+            <div class="vbar-item">    
+
+                <div class="vbar-track">    
+
+                    <div    
+                        id="credibleBar"    
+                        class="vbar credible">    
+
+                        <span class="vbar-value">    
+                            0%    
+                        </span>    
+
+                    </div>    
+
+                </div>    
+
+                <label>    
+                    Credible    
+                </label>    
+
+            </div>    
+
+
+            <div class="vbar-item">    
+
+                <div class="vbar-track">    
+
+                    <div    
+                        id="suspiciousBar"    
+                        class="vbar suspicious">    
+
+                        <span class="vbar-value">    
+                            0%    
+                        </span>    
+
+                    </div>    
+
+                </div>    
+
+                <label>    
+                    Not Credible    
+                </label>    
+
+            </div>    
+
+        </div>    
+
+    </div>    
+
+
+    <!-- RESULT ACTIONS -->
+
+    <div class="result-actions">
+        <button type="button" onclick="copyResultText()">📋 Copy Text</button>
+        <button type="button" onclick="downloadReport()">⬇ Download Report (TXT)</button>
+    </div>
+
+    <!-- DISCLAIMER -->    
+
+    <div class="disclaimer">    
+
+        <span>ⓘ</span>    
+
+        <p>    
+            ReviewWise detects language and presentation    
+            patterns. A score does not establish whether    
+            a claim is factually true or false. Always    
+            verify important information with reliable    
+            sources.    
+        </p>    
+
+    </div>    
+
+</section>    
+
+
+<!-- =================================================    
+     HIGHLIGHTED OUTPUT    
+================================================== -->    
+
+<section    
+    id="highlightedContainer"    
+    class="output-card hidden">    
+
+    <div class="section-heading compact">    
+
+        <div>    
+
+            <span class="section-eyebrow">    
+                TEXT INSPECTION    
+            </span>    
+
+            <h3>    
+                OUTPUT    
+            </h3>    
+
+        </div>    
+
+        <span class="legend">    
+
+            <span></span>    
+
+            REASON WHY THE CREDIBILITY GOES DOWN    
+
+        </span>    
+
+    </div>    
+
+    <div id="highlightedText"></div>    
+
+</section>
+
+</main>    <button    
+class="plus"    
+id="plusButton"    
+onclick="toggleMenu()"    
+aria-label="Add content">
+
+<span>+</span>
+
+</button>    <div    
+    id="menu"    
+    aria-hidden="true">    <button onclick="openCamera()">    
+
+    <span class="menu-icon">📷</span>    
+
+    <span>    
+        <strong>Camera</strong>    
+        <small>Scan with camera</small>    
+    </span>    
+
+</button>    
+
+<button onclick="openPhotoPicker()">    
+
+    <span class="menu-icon">🖼️</span>    
+
+    <span>    
+        <strong>Photos</strong>    
+        <small>Scan an image</small>    
+    </span>    
+
+</button>    
+
+<button onclick="openVideoPicker()">    
+
+    <span class="menu-icon">🎥</span>    
+
+    <span>    
+        <strong>Videos</strong>    
+        <small>Scan video frames</small>    
+    </span>    
+
+</button>    
+
+<button onclick="openFilePicker()">    
+
+    <span class="menu-icon">📄</span>    
+
+    <span>    
+        <strong>Files</strong>    
+        <small>PDF, DOCX or TXT</small>    
+    </span>    
+
+</button>
+
+</div>    <!-- =====================================================    
+     FILE INPUTS    
+====================================================== -->    <input    
+type="file"    
+id="camera"    
+accept="image/*"    
+capture="environment"    
+hidden>
+
+<input    
+type="file"    
+id="photo"    
+accept="image/*"    
+hidden>
+
+<input    
+type="file"    
+id="video"    
+accept="video/*"    
+hidden>
+
+<input    
+type="file"    
+id="file"    
+accept=".pdf,.docx,.txt"    
+hidden>
+
+<div    
+    id="cameraModal"    
+    class="camera-modal hidden">    <div class="camera-box">    
+
+    <div class="camera-header">    
+
+        <div>    
+
+            <span class="section-eyebrow">    
+                LIVE CAMERA    
+            </span>    
+
+            <h2>    
+                Scan Content    
+            </h2>    
+
+        </div>    
+
+        <button    
+            type="button"    
+            class="camera-close"    
+            onclick="closeCamera()"    
+            aria-label="Close camera">    
+            ×    
+        </button>    
+
+    </div>    
+
+
+    <div class="camera-preview-wrapper">    
+
+        <video    
+            id="cameraPreview"    
+            autoplay    
+            muted    
+            playsinline>    
+        </video>    
+
+        <div class="camera-guide">    
+
+            <div class="guide-corner top-left"></div>    
+            <div class="guide-corner top-right"></div>    
+            <div class="guide-corner bottom-left"></div>    
+            <div class="guide-corner bottom-right"></div>    
+
+        </div>    
+
+        <div    
+            id="cameraStatus"    
+            class="camera-status">    
+            Point the camera at readable text    
+        </div>    
+
+    </div>    
+
+
+    <div    
+        id="cameraReview"    
+        class="camera-review hidden">    
+
+        <img    
+            id="capturedImage"    
+            alt="Captured image">    
+
+    </div>    
+
+
+    <canvas    
+        id="cameraCanvas"    
+        class="hidden">    
+    </canvas>    
+
+
+    <div class="camera-controls">    
+
+        <button    
+            type="button"    
+            class="camera-secondary"    
+            onclick="closeCamera()">    
+            Cancel    
+        </button>    
+
+        <button    
+            type="button"    
+            id="captureButton"    
+            class="capture-button"    
+            onclick="captureCamera()">    
+
+            <span class="capture-dot"></span>    
+
+            Capture    
+
+        </button>    
+
+        <button    
+            type="button"    
+            id="retakeButton"    
+            class="camera-secondary hidden"    
+            onclick="retakeCamera()">    
+            Retake    
+        </button>    
+
+        <button    
+            type="button"    
+            id="confirmButton"    
+            class="camera-confirm hidden"    
+            onclick="confirmCameraCapture()">    
+            Use Photo    
+        </button>    
+
+    </div>    
+
+</div>
+
+</div>    <div id="dropOverlay" class="drop-overlay hidden">
+    <div class="drop-overlay-card">Drop your file here</div>
+</div>
+
+<div    
+    id="toast"    
+    class="toast hidden"    <span id="toastIcon">    
+    ✓    
+</span>    
+
+<span id="toastMessage">    
+    Done    
+</span>
+
+</div>    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>    <script src="script.js"></script>  </body>  </html>     
