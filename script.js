@@ -4,10 +4,9 @@
    REVIEWWISE CONFIGURATION
 ========================================================= */
 
-const API_BASE = "https://reviewwise.onrender.com/";
+const API_BASE = "https://reviewwise.onrender.com";
 
 const REQUEST_TIMEOUT_MS = 45000;
-
 const MAX_HISTORY_ITEMS = 50;
 
 let uploadedFile = null;
@@ -24,14 +23,13 @@ let isProcessing = false;
 let speechRecognition = null;
 let isListening = false;
 
-/* Most recent OCR result (kept so the review card can be
-   re-analyzed / copied without re-running OCR). */
+/* Most recent OCR result */
 let lastOcrRaw = "";
 let lastOcrClean = "";
 let lastOcrQuality = null;
 let lastOcrSourceKind = null;
 
-/* Drag & drop counter (tracks nested dragenter/dragleave) */
+/* Drag & drop counter */
 let dragDepth = 0;
 
 
@@ -105,11 +103,9 @@ function $(id) {
 
 function escapeHtml(text) {
 
-    const div =
-        document.createElement("div");
+    const div = document.createElement("div");
 
-    div.textContent =
-        text ?? "";
+    div.textContent = text ?? "";
 
     return div.innerHTML;
 }
@@ -137,12 +133,8 @@ function normalizeForMatching(text) {
     return String(text || "")
         .normalize("NFKC")
         .toLowerCase()
-        .replace(
-            /\s+/g,
-            " "
-        )
+        .replace(/\s+/g, " ")
         .trim();
-
 }
 
 
@@ -150,19 +142,14 @@ function normalizeForMatching(text) {
    FETCH WITH TIMEOUT
 ========================================================= */
 
-async function fetchWithTimeout(
-    url,
-    options = {}
-) {
+async function fetchWithTimeout(url, options = {}) {
 
-    const controller =
-        new AbortController();
+    const controller = new AbortController();
 
-    const timer =
-        setTimeout(
-            () => controller.abort(),
-            REQUEST_TIMEOUT_MS
-        );
+    const timer = setTimeout(
+        () => controller.abort(),
+        REQUEST_TIMEOUT_MS
+    );
 
     try {
 
@@ -170,8 +157,7 @@ async function fetchWithTimeout(
             url,
             {
                 ...options,
-                signal:
-                    controller.signal
+                signal: controller.signal
             }
         );
 
@@ -180,7 +166,6 @@ async function fetchWithTimeout(
         clearTimeout(timer);
 
     }
-
 }
 
 
@@ -188,37 +173,26 @@ async function fetchWithTimeout(
    JSON RESPONSE
 ========================================================= */
 
-async function getJsonResponse(
-    response
-) {
+async function getJsonResponse(response) {
 
     const contentType =
-        response.headers.get(
-            "content-type"
-        ) || "";
+        response.headers.get("content-type") || "";
 
-    const text =
-        await response.text();
+    const text = await response.text();
 
-    if (
-        contentType.includes(
-            "application/json"
-        )
-    ) {
+    if (contentType.includes("application/json")) {
 
         let data;
 
         try {
 
-            data =
-                JSON.parse(text);
+            data = JSON.parse(text);
 
         } catch {
 
             throw new Error(
                 "The server returned invalid JSON."
             );
-
         }
 
         if (!response.ok) {
@@ -227,7 +201,6 @@ async function getJsonResponse(
                 data.error ||
                 `Server error: ${response.status}`
             );
-
         }
 
         return data;
@@ -237,14 +210,8 @@ async function getJsonResponse(
 
         const cleanText =
             text
-                .replace(
-                    /<[^>]*>/g,
-                    " "
-                )
-                .replace(
-                    /\s+/g,
-                    " "
-                )
+                .replace(/<[^>]*>/g, " ")
+                .replace(/\s+/g, " ")
                 .trim();
 
         throw new Error(
@@ -265,26 +232,17 @@ async function getJsonResponse(
 
 let toastTimer = null;
 
-function showToast(
-    message,
-    type = "success"
-) {
+function showToast(message, type = "success") {
 
-    const toast =
-        $("toast");
-
-    const toastMessage =
-        $("toastMessage");
-
-    const toastIcon =
-        $("toastIcon");
+    const toast = $("toast");
+    const toastMessage = $("toastMessage");
+    const toastIcon = $("toastIcon");
 
     if (!toast || !toastMessage) {
         return;
     }
 
-    toastMessage.textContent =
-        message;
+    toastMessage.textContent = message;
 
     if (toastIcon) {
 
@@ -303,44 +261,27 @@ function showToast(
                     : "#16a34a";
     }
 
-    toast.classList.remove(
-        "hidden"
-    );
+    toast.classList.remove("hidden");
 
-    requestAnimationFrame(
-        () => {
+    requestAnimationFrame(() => {
 
-            toast.classList.add(
-                "show"
-            );
+        toast.classList.add("show");
 
-        }
-    );
+    });
 
-    clearTimeout(
-        toastTimer
-    );
+    clearTimeout(toastTimer);
 
-    toastTimer =
-        setTimeout(
-            () => {
+    toastTimer = setTimeout(() => {
 
-                toast.classList.remove(
-                    "show"
-                );
+        toast.classList.remove("show");
 
-                setTimeout(
-                    () => {
-                        toast.classList.add(
-                            "hidden"
-                        );
-                    },
-                    250
-                );
+        setTimeout(() => {
 
-            },
-            3000
-        );
+            toast.classList.add("hidden");
+
+        }, 250);
+
+    }, 3000);
 }
 
 
@@ -348,18 +289,15 @@ function showToast(
    STATUS MESSAGE
 ========================================================= */
 
-function setStatus(
-    message,
-    visible = true
-) {
+function setStatus(message, visible = true) {
 
-    const status =
-        $("ocrStatus");
+    const status = $("ocrStatus");
 
-    if (!status) return;
+    if (!status) {
+        return;
+    }
 
-    status.textContent =
-        message || "";
+    status.textContent = message || "";
 
     status.classList.toggle(
         "hidden",
@@ -377,23 +315,19 @@ function setLoading(
     message = "Analyzing..."
 ) {
 
-    isProcessing =
-        Boolean(state);
+    isProcessing = Boolean(state);
 
-    const button =
-        $("generateButton");
+    const button = $("generateButton");
 
     if (button) {
 
-        button.disabled =
-            state;
+        button.disabled = state;
 
         button.innerHTML =
             state
                 ? `<span>${escapeHtml(message)}</span><span>...</span>`
                 : `<span>Analyze Content</span><span>→</span>`;
     }
-
 }
 
 
@@ -403,18 +337,14 @@ function setLoading(
 
 function updateCharacterCount() {
 
-    const input =
-        $("newsInput");
-
-    const counter =
-        $("characterCount");
+    const input = $("newsInput");
+    const counter = $("characterCount");
 
     if (!input || !counter) {
         return;
     }
 
-    const count =
-        input.value.length;
+    const count = input.value.length;
 
     counter.textContent =
         `${count.toLocaleString()} characters`;
@@ -430,7 +360,9 @@ function updateWordCount() {
     const input = $("newsInput");
     const counter = $("wordCount");
 
-    if (!input || !counter) return;
+    if (!input || !counter) {
+        return;
+    }
 
     const words =
         input.value.trim().length
@@ -443,52 +375,66 @@ function updateWordCount() {
 
 
 /* =========================================================
-   IMAGE METADATA DISPLAY
+   IMAGE METADATA
 ========================================================= */
 
-function formatFileSize(
-    bytes
-) {
+function formatFileSize(bytes) {
 
-    if (!Number.isFinite(bytes)) return "";
+    if (!Number.isFinite(bytes)) {
+        return "";
+    }
 
-    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
 
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024) {
+        return `${(bytes / 1024).toFixed(1)} KB`;
+    }
 
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function updateImageMeta(
-    file,
-    width,
-    height
-) {
+
+function updateImageMeta(file, width, height) {
 
     const meta = $("imageMeta");
 
-    if (!meta) return;
+    if (!meta) {
+        return;
+    }
 
     const parts = [];
 
     if (file?.name) {
-        parts.push(`<span><strong>${escapeHtml(file.name)}</strong></span>`);
+
+        parts.push(
+            `<span><strong>${escapeHtml(file.name)}</strong></span>`
+        );
     }
 
     if (Number.isFinite(file?.size)) {
-        parts.push(`<span>${formatFileSize(file.size)}</span>`);
+
+        parts.push(
+            `<span>${formatFileSize(file.size)}</span>`
+        );
     }
 
     if (width && height) {
-        parts.push(`<span>${width} × ${height}px</span>`);
+
+        parts.push(
+            `<span>${width} × ${height}px</span>`
+        );
     }
 
     if (parts.length === 0) {
+
         meta.classList.add("hidden");
         return;
     }
 
     meta.innerHTML = parts.join("");
+
     meta.classList.remove("hidden");
 }
 
@@ -497,12 +443,9 @@ function updateImageMeta(
    SCORE STATUS
 ========================================================= */
 
-function getScoreLevel(
-    score
-) {
+function getScoreLevel(score) {
 
-    const value =
-        Number(score) || 0;
+    const value = Number(score) || 0;
 
     if (value >= 80) {
 
@@ -537,12 +480,9 @@ function getScoreLevel(
    SCORE COLOR
 ========================================================= */
 
-function getScoreColor(
-    score
-) {
+function getScoreColor(score) {
 
-    const value =
-        Number(score) || 0;
+    const value = Number(score) || 0;
 
     if (value >= 80) {
         return "#16a34a";
@@ -560,31 +500,20 @@ function getScoreColor(
    STATUS CLASS
 ========================================================= */
 
-function statusClass(
-    status,
-    credibility
-) {
+function statusClass(status, credibility) {
 
-    const score =
-        Number(credibility);
+    const score = Number(credibility);
 
-    if (
-        Number.isFinite(score)
-    ) {
+    if (Number.isFinite(score)) {
 
-        return getScoreLevel(
-            score
-        ).key;
+        return getScoreLevel(score).key;
 
     }
 
     const normalized =
-        String(status || "")
-            .toLowerCase();
+        String(status || "").toLowerCase();
 
-    if (
-        normalized.includes("high")
-    ) {
+    if (normalized.includes("high")) {
         return "high";
     }
 
@@ -603,34 +532,27 @@ function statusClass(
    GRAPH BAR
 ========================================================= */
 
-function setBar(
-    id,
-    value
-) {
+function setBar(id, value) {
 
-    const el =
-        $(id);
+    const el = $(id);
 
-    if (!el) return;
+    if (!el) {
+        return;
+    }
 
     const v =
         Math.max(
             0,
             Math.min(
                 100,
-                Math.round(
-                    Number(value) || 0
-                )
+                Math.round(Number(value) || 0)
             )
         );
 
-    el.style.height =
-        `${v}%`;
+    el.style.height = `${v}%`;
 
     const valueSpan =
-        el.querySelector(
-            ".vbar-value"
-        );
+        el.querySelector(".vbar-value");
 
     if (valueSpan) {
 
@@ -644,97 +566,62 @@ function setBar(
    GET SUSPICIOUS WORDS
 ========================================================= */
 
-function getSuspiciousWords(
-    backendWords = []
-) {
+function getSuspiciousWords(backendWords = []) {
 
     const words = [];
 
-    if (
-        Array.isArray(
-            backendWords
-        )
-    ) {
+    if (Array.isArray(backendWords)) {
 
-        backendWords.forEach(
-            word => {
+        backendWords.forEach(word => {
 
-                if (
-                    word &&
-                    word.text
-                ) {
-
-                    words.push({
-
-                        text:
-                            String(
-                                word.text
-                            ),
-
-                        category:
-                            word.category ||
-                            "suspicious"
-
-                    });
-                }
-            }
-        );
-    }
-
-    suspiciousWords.forEach(
-        word => {
-
-            const exists =
-                words.some(
-                    item =>
-                        normalizeForMatching(
-                            item.text
-                        ) ===
-                        normalizeForMatching(
-                            word
-                        )
-                );
-
-            if (!exists) {
+            if (word && word.text) {
 
                 words.push({
-
-                    text:
-                        word,
-
+                    text: String(word.text),
                     category:
+                        word.category ||
                         "suspicious"
-
                 });
             }
-        }
-    );
 
-    const seen =
-        new Set();
+        });
+    }
+
+    suspiciousWords.forEach(word => {
+
+        const exists =
+            words.some(
+                item =>
+                    normalizeForMatching(item.text) ===
+                    normalizeForMatching(word)
+            );
+
+        if (!exists) {
+
+            words.push({
+                text: word,
+                category: "suspicious"
+            });
+        }
+
+    });
+
+    const seen = new Set();
 
     const unique =
-        words.filter(
-            item => {
+        words.filter(item => {
 
-                const key =
-                    normalizeForMatching(
-                        item.text
-                    );
+            const key =
+                normalizeForMatching(item.text);
 
-                if (
-                    !key ||
-                    seen.has(key)
-                ) {
-
-                    return false;
-                }
-
-                seen.add(key);
-
-                return true;
+            if (!key || seen.has(key)) {
+                return false;
             }
-        );
+
+            seen.add(key);
+
+            return true;
+        });
 
     unique.sort(
         (a, b) =>
@@ -747,11 +634,7 @@ function getSuspiciousWords(
 
 
 /* =========================================================
-   SAFE HIGHLIGHTING
-   =========================================================
-   Important:
-   We escape the complete text FIRST and then only inject
-   spans around matching words/phrases.
+   HIGHLIGHT SUSPICIOUS WORDS
 ========================================================= */
 
 function highlightSuspiciousWords(
@@ -764,25 +647,11 @@ function highlightSuspiciousWords(
     }
 
     const words =
-        getSuspiciousWords(
-            backendWords
-        );
+        getSuspiciousWords(backendWords);
 
-    if (
-        words.length === 0
-    ) {
-
-        return escapeHtml(
-            text
-        );
+    if (words.length === 0) {
+        return escapeHtml(text);
     }
-
-    /*
-     * Build ONE regex instead of repeatedly replacing
-     * already-created HTML spans.
-     *
-     * This prevents nested/broken HTML.
-     */
 
     const patterns =
         words
@@ -799,13 +668,8 @@ function highlightSuspiciousWords(
                     a.length
             );
 
-    if (
-        patterns.length === 0
-    ) {
-
-        return escapeHtml(
-            text
-        );
+    if (patterns.length === 0) {
+        return escapeHtml(text);
     }
 
     const regex =
@@ -815,25 +679,17 @@ function highlightSuspiciousWords(
         );
 
     let html = "";
-
     let lastIndex = 0;
-
     let match;
 
-    while (
-        (
-            match =
-            regex.exec(text)
-        ) !== null
-    ) {
+    while ((match = regex.exec(text)) !== null) {
 
-        html +=
-            escapeHtml(
-                text.slice(
-                    lastIndex,
-                    match.index
-                )
-            );
+        html += escapeHtml(
+            text.slice(
+                lastIndex,
+                match.index
+            )
+        );
 
         html +=
             `<span class="highlight highlight-suspicious" title="Suspicious language">${escapeHtml(match[0])}</span>`;
@@ -843,12 +699,9 @@ function highlightSuspiciousWords(
             match[0].length;
     }
 
-    html +=
-        escapeHtml(
-            text.slice(
-                lastIndex
-            )
-        );
+    html += escapeHtml(
+        text.slice(lastIndex)
+    );
 
     return html;
 }
@@ -858,9 +711,7 @@ function highlightSuspiciousWords(
    BUILD DYNAMIC EXPLANATIONS
 ========================================================= */
 
-function buildDynamicExplanations(
-    analysis
-) {
+function buildDynamicExplanations(analysis) {
 
     const explanations = [];
 
@@ -874,107 +725,80 @@ function buildDynamicExplanations(
     }
 
     const text =
-        String(
-            analysis.text || ""
-        );
+        String(analysis.text || "");
 
     const lower =
-        normalizeForMatching(
-            text
-        );
+        normalizeForMatching(text);
 
     const backendWords =
         getSuspiciousWords(
-            analysis.highlightedWords ||
-            []
+            analysis.highlightedWords || []
         );
 
-    backendWords.forEach(
-        item => {
+    backendWords.forEach(item => {
 
-            const normalizedWord =
-                normalizeForMatching(
-                    item.text
-                );
+        const normalizedWord =
+            normalizeForMatching(item.text);
 
-            if (
-                !lower.includes(
-                    normalizedWord
-                )
-            ) {
-                return;
-            }
-
-            let message =
-                "This wording may deserve additional verification.";
-
-            const word =
-                item.text;
-
-            if (
-                normalizedWord ===
-                    "breaking" ||
-                normalizedWord ===
-                    "shocking" ||
-                normalizedWord ===
-                    "viral"
-            ) {
-
-                message =
-                    `"${word}" uses attention-grabbing language that may create urgency or emotional reaction.`;
-            }
-
-            else if (
-                normalizedWord ===
-                    "guaranteed" ||
-                normalizedWord ===
-                    "101%" ||
-                normalizedWord ===
-                    "unbelievable"
-            ) {
-
-                message =
-                    `"${word}" makes an absolute or exaggerated claim that may require supporting evidence.`;
-            }
-
-            else if (
-                normalizedWord ===
-                    "secret"
-            ) {
-
-                message =
-                    `"${word}" can create curiosity or imply hidden information without providing evidence.`;
-            }
-
-            else if (
-                normalizedWord ===
-                    "click here" ||
-                normalizedWord ===
-                    "share this"
-            ) {
-
-                message =
-                    `"${word}" encourages immediate interaction or sharing rather than careful verification.`;
-            }
-
-            explanations.push({
-                icon: "⚠️",
-                text: message
-            });
+        if (!lower.includes(normalizedWord)) {
+            return;
         }
-    );
+
+        let message =
+            "This wording may deserve additional verification.";
+
+        const word = item.text;
+
+        if (
+            normalizedWord === "breaking" ||
+            normalizedWord === "shocking" ||
+            normalizedWord === "viral"
+        ) {
+
+            message =
+                `"${word}" uses attention-grabbing language that may create urgency or emotional reaction.`;
+        }
+
+        else if (
+            normalizedWord === "guaranteed" ||
+            normalizedWord === "101%" ||
+            normalizedWord === "unbelievable"
+        ) {
+
+            message =
+                `"${word}" makes an absolute or exaggerated claim that may require supporting evidence.`;
+        }
+
+        else if (
+            normalizedWord === "secret"
+        ) {
+
+            message =
+                `"${word}" can create curiosity or imply hidden information without providing evidence.`;
+        }
+
+        else if (
+            normalizedWord === "click here" ||
+            normalizedWord === "share this"
+        ) {
+
+            message =
+                `"${word}" encourages immediate interaction or sharing rather than careful verification.`;
+        }
+
+        explanations.push({
+            icon: "⚠️",
+            text: message
+        });
+    });
 
 
     const exclamationCount =
         (
-            text.match(
-                /!/g
-            ) || []
+            text.match(/!/g) || []
         ).length;
 
-    if (
-        exclamationCount >= 3
-    ) {
+    if (exclamationCount >= 3) {
 
         explanations.push({
 
@@ -992,9 +816,7 @@ function buildDynamicExplanations(
             /\b[A-Z]{3,}\b/g
         ) || [];
 
-    if (
-        capsMatches.length >= 3
-    ) {
+    if (capsMatches.length >= 3) {
 
         explanations.push({
 
@@ -1007,9 +829,7 @@ function buildDynamicExplanations(
     }
 
 
-    if (
-        explanations.length === 0
-    ) {
+    if (explanations.length === 0) {
 
         explanations.push({
 
@@ -1021,7 +841,6 @@ function buildDynamicExplanations(
         });
     }
 
-
     return explanations;
 }
 
@@ -1030,19 +849,13 @@ function buildDynamicExplanations(
    GET BREAKDOWN COUNTS
 ========================================================= */
 
-function getBreakdown(
-    analysis
-) {
+function getBreakdown(analysis) {
 
     const text =
-        String(
-            analysis.text || ""
-        );
+        String(analysis.text || "");
 
     const lower =
-        normalizeForMatching(
-            text
-        );
+        normalizeForMatching(text);
 
     const clickbait =
         suspiciousWords.filter(
@@ -1053,13 +866,9 @@ function getBreakdown(
                     "viral",
                     "click here",
                     "share this"
-                ].includes(
-                    word
-                ) &&
+                ].includes(word) &&
                 lower.includes(
-                    normalizeForMatching(
-                        word
-                    )
+                    normalizeForMatching(word)
                 )
         ).length;
 
@@ -1071,13 +880,9 @@ function getBreakdown(
                     "101%",
                     "unbelievable",
                     "secret"
-                ].includes(
-                    word
-                ) &&
+                ].includes(word) &&
                 lower.includes(
-                    normalizeForMatching(
-                        word
-                    )
+                    normalizeForMatching(word)
                 )
         ).length;
 
@@ -1090,35 +895,22 @@ function getBreakdown(
 
     const punctuation =
         (
-            text.match(
-                /!/g
-            ) || []
+            text.match(/!/g) || []
         ).length;
-
-    /*
-     * Keep suspicious count useful even if the backend
-     * returns a different structure.
-     */
 
     const suspicious =
         Number.isFinite(
-            Number(
-                analysis.suspiciousCount
-            )
+            Number(analysis.suspiciousCount)
         )
-            ? Number(
-                analysis.suspiciousCount
-            )
-            : clickbait +
-                misleading;
+            ? Number(analysis.suspiciousCount)
+            : clickbait + misleading;
 
     return {
 
         suspicious:
             Math.max(
                 suspicious,
-                clickbait +
-                misleading
+                clickbait + misleading
             ),
 
         clickbait,
@@ -1132,12 +924,8 @@ function getBreakdown(
         emotional:
             Math.min(
                 100,
-                (
-                    punctuation * 15
-                ) +
-                (
-                    capitalization * 10
-                )
+                punctuation * 15 +
+                capitalization * 10
             )
     };
 }
@@ -1147,9 +935,7 @@ function getBreakdown(
    SAVE HISTORY
 ========================================================= */
 
-function saveHistory(
-    analysis
-) {
+function saveHistory(analysis) {
 
     try {
 
@@ -1161,19 +947,13 @@ function saveHistory(
             );
 
         const text =
-            String(
-                analysis.text || ""
-            );
+            String(analysis.text || "");
 
         const score =
-            Number(
-                analysis.credibility
-            ) || 0;
+            Number(analysis.credibility) || 0;
 
         const level =
-            getScoreLevel(
-                score
-            );
+            getScoreLevel(score);
 
         const type =
             analysis.contentType ||
@@ -1193,40 +973,27 @@ function saveHistory(
 
             snippet:
                 text
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .slice(
-                        0,
-                        100
-                    ),
+                    .replace(/\s+/g, " ")
+                    .slice(0, 100),
 
-            credibility:
-                score,
+            credibility: score,
 
-            status:
-                level.label,
+            status: level.label,
 
-            risk:
-                100 - score,
+            risk: 100 - score,
 
-            contentType:
-                type,
+            contentType: type,
 
             analysis: {
                 ...analysis
             },
 
             time:
-                new Date()
-                    .toLocaleString()
+                new Date().toLocaleString()
 
         };
 
-        list.unshift(
-            item
-        );
+        list.unshift(item);
 
         list =
             list.slice(
@@ -1236,9 +1003,7 @@ function saveHistory(
 
         localStorage.setItem(
             "reviewwiseHistory",
-            JSON.stringify(
-                list
-            )
+            JSON.stringify(list)
         );
 
     } catch (error) {
@@ -1255,24 +1020,18 @@ function saveHistory(
    RENDER ANALYSIS
 ========================================================= */
 
-function renderAnalysis(
-    analysis
-) {
+function renderAnalysis(analysis) {
 
     if (!analysis) {
         return;
     }
 
-    const result =
-        $("result");
+    const result = $("result");
 
     const highlightedContainer =
         $("highlightedContainer");
 
-    if (
-        !result ||
-        !highlightedContainer
-    ) {
+    if (!result || !highlightedContainer) {
         return;
     }
 
@@ -1281,31 +1040,21 @@ function renderAnalysis(
             0,
             Math.min(
                 100,
-                Number(
-                    analysis.credibility
-                ) || 0
+                Number(analysis.credibility) || 0
             )
         );
 
     const level =
-        getScoreLevel(
-            score
-        );
+        getScoreLevel(score);
 
     const color =
-        getScoreColor(
-            score
-        );
+        getScoreColor(score);
 
     const breakdown =
-        getBreakdown(
-            analysis
-        );
+        getBreakdown(analysis);
 
 
-    /* =====================================================
-       RESULT TYPE
-    ====================================================== */
+    /* RESULT TYPE */
 
     const typeBadge =
         $("resultTypeBadge");
@@ -1318,28 +1067,19 @@ function renderAnalysis(
             "text";
 
         typeBadge.textContent =
-            String(type)
-                .toUpperCase();
+            String(type).toUpperCase();
     }
 
 
-    /* =====================================================
-       SCORE NUMBER
-    ====================================================== */
+    /* SCORE */
 
     const scoreNumber =
         $("scoreNumber");
 
     if (scoreNumber) {
-
-        scoreNumber.textContent =
-            score;
+        scoreNumber.textContent = score;
     }
 
-
-    /* =====================================================
-       SCORE LEVEL
-    ====================================================== */
 
     const scoreLevel =
         $("scoreLevel");
@@ -1364,9 +1104,7 @@ function renderAnalysis(
     }
 
 
-    /* =====================================================
-       SCORE RING
-    ====================================================== */
+    /* SCORE RING */
 
     const scoreRing =
         $("scoreRing");
@@ -1383,9 +1121,7 @@ function renderAnalysis(
     }
 
 
-    /* =====================================================
-       SCORE PROGRESS
-    ====================================================== */
+    /* SCORE PROGRESS */
 
     const progress =
         $("scoreProgressBar");
@@ -1410,9 +1146,7 @@ function renderAnalysis(
     }
 
 
-    /* =====================================================
-       PATTERN BREAKDOWN
-    ====================================================== */
+    /* PATTERN BREAKDOWN */
 
     const breakdownContainer =
         $("patternBreakdown");
@@ -1445,56 +1179,44 @@ function renderAnalysis(
 
         breakdownContainer.innerHTML =
             items
-                .map(
-                    item => {
+                .map(item => {
 
-                        const def =
-                            patternDefinitions[
-                                item.key
-                            ];
+                    const def =
+                        patternDefinitions[item.key];
 
-                        return `
+                    return `
 
-                            <div class="pattern-item">
+                        <div class="pattern-item">
 
-                                <div class="pattern-item-header">
+                            <div class="pattern-item-header">
 
-                                    <span class="pattern-icon">
-                                        ${def.icon}
-                                    </span>
-
-                                    <strong>
-                                        ${escapeHtml(
-                                            def.label
-                                        )}
-                                    </strong>
-
-                                </div>
-
-                                <span class="pattern-count">
-
-                                    ${
-                                        Number(
-                                            item.value
-                                        ) || 0
-                                    }
-
-                                    detected
-
+                                <span class="pattern-icon">
+                                    ${def.icon}
                                 </span>
+
+                                <strong>
+                                    ${escapeHtml(def.label)}
+                                </strong>
 
                             </div>
 
-                        `;
-                    }
-                )
+                            <span class="pattern-count">
+
+                                ${Number(item.value) || 0}
+
+                                detected
+
+                            </span>
+
+                        </div>
+
+                    `;
+                })
                 .join("");
     }
 
 
-    /* =====================================================
-       DYNAMIC EXPLANATIONS
-    ====================================================== */
+    /* EXPLANATIONS */
 
     const detailed =
         $("detailedExplanations");
@@ -1502,9 +1224,7 @@ function renderAnalysis(
     if (detailed) {
 
         const explanations =
-            buildDynamicExplanations(
-                analysis
-            );
+            buildDynamicExplanations(analysis);
 
         detailed.innerHTML =
             explanations
@@ -1518,9 +1238,7 @@ function renderAnalysis(
                             </span>
 
                             <span>
-                                ${escapeHtml(
-                                    item.text
-                                )}
+                                ${escapeHtml(item.text)}
                             </span>
 
                         </div>
@@ -1531,9 +1249,7 @@ function renderAnalysis(
     }
 
 
-    /* =====================================================
-       GRAPH
-    ====================================================== */
+    /* GRAPH */
 
     setBar(
         "credibleBar",
@@ -1546,13 +1262,10 @@ function renderAnalysis(
     );
 
 
-    /* =====================================================
-       HIGHLIGHTED TEXT
-    ====================================================== */
+    /* HIGHLIGHTED TEXT */
 
     const output =
-        analysis.text ||
-        "";
+        analysis.text || "";
 
     const highlightedText =
         $("highlightedText");
@@ -1562,16 +1275,12 @@ function renderAnalysis(
         highlightedText.innerHTML =
             highlightSuspiciousWords(
                 output,
-                analysis.highlightedWords ||
-                []
+                analysis.highlightedWords || []
             );
     }
 
 
-    /* =====================================================
-       EXPLANATION LEGACY ELEMENT
-       Kept for compatibility.
-    ====================================================== */
+    /* LEGACY EXPLANATION */
 
     const explanation =
         $("explanation");
@@ -1583,43 +1292,22 @@ function renderAnalysis(
     }
 
 
-    /* =====================================================
-       SHOW RESULT
-    ====================================================== */
+    result.classList.remove("hidden");
 
-    result.classList.remove(
-        "hidden"
-    );
-
-    highlightedContainer.classList.remove(
-        "hidden"
-    );
+    highlightedContainer.classList.remove("hidden");
 
 
-    /* =====================================================
-       SAVE HISTORY
-    ====================================================== */
-
-    saveHistory(
-        analysis
-    );
+    saveHistory(analysis);
 
 
-    /*
-     * Scroll gently to result.
-     */
+    setTimeout(() => {
 
-    setTimeout(
-        () => {
+        result.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
 
-            result.scrollIntoView({
-                behavior: "smooth",
-                block: "start"
-            });
-
-        },
-        100
-    );
+    }, 100);
 }
 
 
@@ -1659,15 +1347,17 @@ async function analyzeTextInput(
 
     try {
 
-        setLoading(true, "Analyzing credibility...");
+        setLoading(
+            true,
+            "Analyzing credibility..."
+        );
 
         const response =
             await fetchWithTimeout(
                 `${API_BASE}/analyze`,
                 {
 
-                    method:
-                        "POST",
+                    method: "POST",
 
                     headers: {
                         "Content-Type":
@@ -1682,44 +1372,48 @@ async function analyzeTextInput(
             );
 
         const data =
-            await getJsonResponse(
-                response
-            );
+            await getJsonResponse(response);
 
-        data.contentType =
-            "text";
+        data.contentType = "text";
 
-        setLoading(true, "Generating result...");
 
         /*
-         * OCR REQUIREMENT (#7):
-         * When the source text came from a low-quality OCR
-         * pass, don't let suspicious-word penalties be taken
-         * at face value — dampen the score toward neutral and
-         * clearly flag the uncertainty, rather than pretending
-         * an unreliable extraction is a reliable verdict.
+         * LOW OCR QUALITY DAMPENING
          */
 
-        if (ocrQuality !== null && ocrQuality < 60) {
+        if (
+            ocrQuality !== null &&
+            ocrQuality < 60
+        ) {
 
             const weight =
-                Math.max(0.35, ocrQuality / 60);
+                Math.max(
+                    0.35,
+                    ocrQuality / 60
+                );
 
             const original =
                 Number(data.credibility) || 0;
 
             const damped =
-                Math.round(original * weight + 75 * (1 - weight));
+                Math.round(
+                    original * weight +
+                    75 * (1 - weight)
+                );
 
             data.credibility = damped;
-            data.suspicious = 100 - damped;
+
+            data.suspicious =
+                100 - damped;
+
             data.ocrLowConfidence = true;
-            data.ocrQuality = ocrQuality;
+
+            data.ocrQuality =
+                ocrQuality;
         }
 
-        renderAnalysis(
-            data
-        );
+
+        renderAnalysis(data);
 
         setStatus(
             "Analysis complete.",
@@ -1740,9 +1434,7 @@ async function analyzeTextInput(
 
     } finally {
 
-        setLoading(
-            false
-        );
+        setLoading(false);
     }
 }
 
@@ -1768,10 +1460,7 @@ async function generateResult() {
         input.value.trim();
 
 
-    if (
-        !text &&
-        !uploadedFile
-    ) {
+    if (!text && !uploadedFile) {
 
         showToast(
             "Paste text or upload content first.",
@@ -1784,14 +1473,11 @@ async function generateResult() {
     }
 
 
-    /* =====================================================
-       IMAGE
-    ====================================================== */
+    /* IMAGE */
 
     if (
         uploadedFile &&
-        uploadedFileKind ===
-            "image"
+        uploadedFileKind === "image"
     ) {
 
         return analyzeMedia(
@@ -1803,14 +1489,11 @@ async function generateResult() {
     }
 
 
-    /* =====================================================
-       VIDEO
-    ====================================================== */
+    /* VIDEO */
 
     if (
         uploadedFile &&
-        uploadedFileKind ===
-            "video"
+        uploadedFileKind === "video"
     ) {
 
         return analyzeMedia(
@@ -1822,14 +1505,11 @@ async function generateResult() {
     }
 
 
-    /* =====================================================
-       FILE
-    ====================================================== */
+    /* FILE */
 
     if (
         uploadedFile &&
-        uploadedFileKind ===
-            "file"
+        uploadedFileKind === "file"
     ) {
 
         return analyzeMedia(
@@ -1841,13 +1521,9 @@ async function generateResult() {
     }
 
 
-    /* =====================================================
-       TEXT
-    ====================================================== */
+    /* TEXT */
 
-    await analyzeTextInput(
-        text
-    );
+    await analyzeTextInput(text);
 }
 
 
@@ -1874,10 +1550,7 @@ async function analyzeMedia(
     );
 
 
-    if (
-        contentType ===
-        "video"
-    ) {
+    if (contentType === "video") {
 
         showVideoProgress(
             10,
@@ -1887,8 +1560,7 @@ async function analyzeMedia(
     } else {
 
         setStatus(
-            contentType ===
-                "image"
+            contentType === "image"
                 ? "Processing image..."
                 : "Extracting file text...",
             true
@@ -1907,10 +1579,7 @@ async function analyzeMedia(
         );
 
 
-        if (
-            contentType ===
-            "video"
-        ) {
+        if (contentType === "video") {
 
             showVideoProgress(
                 20,
@@ -1929,10 +1598,7 @@ async function analyzeMedia(
             );
 
 
-        if (
-            contentType ===
-            "video"
-        ) {
+        if (contentType === "video") {
 
             showVideoProgress(
                 85,
@@ -1949,36 +1615,26 @@ async function analyzeMedia(
 
 
         const data =
-            await getJsonResponse(
-                response
-            );
-
+            await getJsonResponse(response);
 
         data.contentType =
             contentType;
 
 
-        renderAnalysis(
-            data
-        );
+        renderAnalysis(data);
 
 
         if (
-            endpoint ===
-            "/analyze-image"
+            endpoint === "/analyze-image"
         ) {
 
             drawHighlightBoxes(
-                data.highlightedWords ||
-                []
+                data.highlightedWords || []
             );
         }
 
 
-        if (
-            contentType ===
-            "video"
-        ) {
+        if (contentType === "video") {
 
             showVideoProgress(
                 100,
@@ -1987,9 +1643,7 @@ async function analyzeMedia(
 
             setTimeout(
                 () => {
-
                     hideVideoProgress();
-
                 },
                 1000
             );
@@ -2008,11 +1662,7 @@ async function analyzeMedia(
             error
         );
 
-        if (
-            contentType ===
-            "video"
-        ) {
-
+        if (contentType === "video") {
             hideVideoProgress();
         }
 
@@ -2023,9 +1673,7 @@ async function analyzeMedia(
 
     } finally {
 
-        setLoading(
-            false
-        );
+        setLoading(false);
     }
 }
 
@@ -2041,8 +1689,7 @@ function handleRequestError(
 
     if (
         error &&
-        error.name ===
-            "AbortError"
+        error.name === "AbortError"
     ) {
 
         showToast(
@@ -2061,15 +1708,9 @@ function handleRequestError(
 
     let message =
         String(
-            error?.message ||
-            ""
+            error?.message || ""
         );
 
-
-    /*
-     * Never surface raw JS engine errors (TypeError internals,
-     * stack-trace-looking text, etc.) directly to the user.
-     */
 
     const looksLikeRawJsError =
         /cannot read propert|undefined is not|is not a function|is not defined|null is not an object/i
@@ -2087,9 +1728,7 @@ function handleRequestError(
     if (
         message
             .toLowerCase()
-            .includes(
-                "failed to fetch"
-            )
+            .includes("failed to fetch")
     ) {
 
         showToast(
@@ -2107,27 +1746,27 @@ function handleRequestError(
 
 
     showToast(
-        message ||
-        fallback,
+        message || fallback,
         "error"
     );
 
     setStatus(
-        message ||
-        fallback,
+        message || fallback,
         true
     );
 }
 
 
 /* =========================================================
-   COPY / DOWNLOAD RESULT
+   COPY RESULT
 ========================================================= */
 
 function copyResultText() {
 
     const input = $("newsInput");
-    const text = input ? input.value : "";
+
+    const text =
+        input ? input.value : "";
 
     if (!text.trim()) {
 
@@ -2141,13 +1780,27 @@ function copyResultText() {
 
     navigator.clipboard
         ?.writeText(text)
-        .then(() => showToast("Copied!"))
-        .catch(() => showToast("Unable to copy text.", "error"));
+        .then(
+            () => showToast("Copied!")
+        )
+        .catch(
+            () =>
+                showToast(
+                    "Unable to copy text.",
+                    "error"
+                )
+        );
 }
+
+
+/* =========================================================
+   DOWNLOAD REPORT
+========================================================= */
 
 function downloadReport() {
 
-    const resultSection = $("result");
+    const resultSection =
+        $("result");
 
     if (
         !resultSection ||
@@ -2175,67 +1828,121 @@ function downloadReport() {
         $("ocrQualityBadge");
 
     const ocrQuality =
-        ocrBadge && !ocrBadge.closest(".hidden")
+        ocrBadge &&
+        !ocrBadge.closest(".hidden")
             ? ocrBadge.textContent.trim()
             : "N/A";
 
     const explanationItems =
         Array.from(
-            document.querySelectorAll("#detailedExplanations .explanation-item")
-        ).map(el => `- ${el.textContent.replace(/\s+/g, " ").trim()}`);
+            document.querySelectorAll(
+                "#detailedExplanations .explanation-item"
+            )
+        )
+        .map(
+            el =>
+                `- ${el.textContent.replace(/\s+/g, " ").trim()}`
+        );
 
     const highlighted =
         getSuspiciousWords()
             .filter(
                 w =>
-                    normalizeForMatching(text).includes(
-                        normalizeForMatching(w.text)
-                    )
+                    normalizeForMatching(text)
+                        .includes(
+                            normalizeForMatching(w.text)
+                        )
             )
-            .map(w => w.text);
+            .map(
+                w => w.text
+            );
 
     const lines = [
+
         "ReviewWise — Credibility Report",
+
         "================================",
+
         "",
+
         `Date: ${new Date().toLocaleString()}`,
+
         `Credibility Score: ${score} / 100`,
+
         `Credibility Level: ${level}`,
+
         `OCR Quality: ${ocrQuality}`,
+
         "",
+
         "Analyzed Text:",
+
         "--------------",
+
         text || "(none)",
+
         "",
+
         "Suspicious Words:",
+
         "-----------------",
-        highlighted.length ? highlighted.join(", ") : "None detected",
+
+        highlighted.length
+            ? highlighted.join(", ")
+            : "None detected",
+
         "",
+
         "Why this score?",
+
         "----------------",
+
         explanationItems.length
             ? explanationItems.join("\n")
             : "No detailed explanations available.",
+
         "",
+
         "This report is a risk indicator, not a fact-check.",
+
         "Always verify important claims with reliable sources."
+
     ];
 
     const blob =
-        new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+        new Blob(
+            [lines.join("\n")],
+            {
+                type:
+                    "text/plain;charset=utf-8"
+            }
+        );
 
-    const url = URL.createObjectURL(blob);
+    const url =
+        URL.createObjectURL(blob);
 
-    const a = document.createElement("a");
+    const a =
+        document.createElement("a");
+
     a.href = url;
-    a.download = `reviewwise-report-${Date.now()}.txt`;
+
+    a.download =
+        `reviewwise-report-${Date.now()}.txt`;
+
     document.body.appendChild(a);
+
     a.click();
+
     a.remove();
 
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(
+        () => URL.revokeObjectURL(url),
+        1000
+    );
 
-    showToast("Report downloaded.");
+    showToast(
+        "Report downloaded."
+    );
 }
 
 
@@ -2262,6 +1969,7 @@ function toggleSpeechToText() {
     if (isListening) {
 
         speechRecognition?.stop();
+
         return;
     }
 
@@ -2277,9 +1985,14 @@ function toggleSpeechToText() {
     speechRecognition.continuous = true;
     speechRecognition.interimResults = true;
 
-    let finalTranscript = input ? input.value : "";
+    let finalTranscript =
+        input ? input.value : "";
 
-    if (finalTranscript && !finalTranscript.endsWith(" ")) {
+    if (
+        finalTranscript &&
+        !finalTranscript.endsWith(" ")
+    ) {
+
         finalTranscript += " ";
     }
 
@@ -2287,57 +2000,99 @@ function toggleSpeechToText() {
 
         isListening = true;
 
-        micButton?.classList.add("listening");
+        micButton?.classList.add(
+            "listening"
+        );
 
-        if (micLabel) micLabel.textContent = "Listening…";
-        if (micIcon) micIcon.textContent = "⏺";
+        if (micLabel) {
+            micLabel.textContent =
+                "Listening…";
+        }
+
+        if (micIcon) {
+            micIcon.textContent =
+                "⏺";
+        }
     };
 
-    speechRecognition.onresult = event => {
+    speechRecognition.onresult =
+        event => {
 
-        let interim = "";
+            let interim = "";
 
-        for (let i = event.resultIndex; i < event.results.length; i++) {
+            for (
+                let i = event.resultIndex;
+                i < event.results.length;
+                i++
+            ) {
 
-            const transcriptChunk = event.results[i][0].transcript;
+                const transcriptChunk =
+                    event.results[i][0]
+                        .transcript;
 
-            if (event.results[i].isFinal) {
-                finalTranscript += transcriptChunk + " ";
-            } else {
-                interim += transcriptChunk;
+                if (
+                    event.results[i].isFinal
+                ) {
+
+                    finalTranscript +=
+                        transcriptChunk + " ";
+
+                } else {
+
+                    interim +=
+                        transcriptChunk;
+                }
             }
-        }
 
-        if (input) {
+            if (input) {
 
-            input.value = (finalTranscript + interim).trim();
+                input.value =
+                    (
+                        finalTranscript +
+                        interim
+                    ).trim();
 
-            updateCharacterCount();
-            updateWordCount();
-        }
-    };
+                updateCharacterCount();
+                updateWordCount();
+            }
+        };
 
-    speechRecognition.onerror = event => {
+    speechRecognition.onerror =
+        event => {
 
-        console.error("Speech recognition error:", event.error);
-
-        if (event.error !== "no-speech") {
-
-            showToast(
-                "Speech recognition ran into an issue. Please try again.",
-                "error"
+            console.error(
+                "Speech recognition error:",
+                event.error
             );
-        }
-    };
+
+            if (
+                event.error !== "no-speech"
+            ) {
+
+                showToast(
+                    "Speech recognition ran into an issue. Please try again.",
+                    "error"
+                );
+            }
+        };
 
     speechRecognition.onend = () => {
 
         isListening = false;
 
-        micButton?.classList.remove("listening");
+        micButton?.classList.remove(
+            "listening"
+        );
 
-        if (micLabel) micLabel.textContent = "Speak";
-        if (micIcon) micIcon.textContent = "🎤";
+        if (micLabel) {
+            micLabel.textContent =
+                "Speak";
+        }
+
+        if (micIcon) {
+            micIcon.textContent =
+                "🎤";
+        }
     };
 
     try {
@@ -2346,7 +2101,10 @@ function toggleSpeechToText() {
 
     } catch (error) {
 
-        console.error("Unable to start speech recognition:", error);
+        console.error(
+            "Unable to start speech recognition:",
+            error
+        );
 
         showToast(
             "Unable to start speech-to-text.",
@@ -2357,20 +2115,30 @@ function toggleSpeechToText() {
 
 
 /* =========================================================
-   DRAG & DROP UPLOAD
+   DRAG & DROP
 ========================================================= */
 
-function routeDroppedFile(
-    file
-) {
+function routeDroppedFile(file) {
 
-    if (!file) return;
+    if (!file) {
+        return;
+    }
 
-    if (file.type.startsWith("image/")) {
+    if (
+        file.type.startsWith("image/")
+    ) {
 
-        runOCR(file, "photo").catch(
+        runOCR(
+            file,
+            "photo"
+        ).catch(
             error => {
-                console.error("Dropped image OCR error:", error);
+
+                console.error(
+                    "Dropped image OCR error:",
+                    error
+                );
+
                 showToast(
                     "Unable to read text from this image. Try a clearer photo.",
                     "error"
@@ -2381,36 +2149,58 @@ function routeDroppedFile(
         return;
     }
 
-    if (file.type.startsWith("video/")) {
+    if (
+        file.type.startsWith("video/")
+    ) {
 
-        const videoInput = $("video");
+        const videoInput =
+            $("video");
 
         if (videoInput) {
 
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            videoInput.files = dt.files;
+            const dt =
+                new DataTransfer();
 
-            videoInput.dispatchEvent(new Event("change"));
+            dt.items.add(file);
+
+            videoInput.files =
+                dt.files;
+
+            videoInput.dispatchEvent(
+                new Event("change")
+            );
         }
 
         return;
     }
 
     const extension =
-        file.name.split(".").pop()?.toLowerCase();
+        file.name
+            .split(".")
+            .pop()
+            ?.toLowerCase();
 
-    if (["pdf", "docx", "txt"].includes(extension)) {
+    if (
+        ["pdf", "docx", "txt"]
+            .includes(extension)
+    ) {
 
-        const fileInput = $("file");
+        const fileInput =
+            $("file");
 
         if (fileInput) {
 
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            fileInput.files = dt.files;
+            const dt =
+                new DataTransfer();
 
-            fileInput.dispatchEvent(new Event("change"));
+            dt.items.add(file);
+
+            fileInput.files =
+                dt.files;
+
+            fileInput.dispatchEvent(
+                new Event("change")
+            );
         }
 
         return;
@@ -2422,61 +2212,98 @@ function routeDroppedFile(
     );
 }
 
+
 function setupDragAndDrop() {
 
-    const dropOverlay = $("dropOverlay");
+    const dropOverlay =
+        $("dropOverlay");
 
-    if (!dropOverlay) return;
+    if (!dropOverlay) {
+        return;
+    }
 
-    ["dragenter", "dragover", "dragleave", "drop"].forEach(
+    [
+        "dragenter",
+        "dragover",
+        "dragleave",
+        "drop"
+    ].forEach(
         eventName => {
 
             document.addEventListener(
                 eventName,
                 event => {
+
                     event.preventDefault();
                     event.stopPropagation();
+
                 }
             );
         }
     );
 
-    document.addEventListener("dragenter", () => {
+    document.addEventListener(
+        "dragenter",
+        () => {
 
-        dragDepth++;
-        dropOverlay.classList.remove("hidden");
-    });
+            dragDepth++;
 
-    document.addEventListener("dragleave", () => {
-
-        dragDepth = Math.max(0, dragDepth - 1);
-
-        if (dragDepth === 0) {
-            dropOverlay.classList.add("hidden");
+            dropOverlay.classList.remove(
+                "hidden"
+            );
         }
-    });
+    );
 
-    document.addEventListener("drop", event => {
+    document.addEventListener(
+        "dragleave",
+        () => {
 
-        dragDepth = 0;
-        dropOverlay.classList.add("hidden");
+            dragDepth =
+                Math.max(
+                    0,
+                    dragDepth - 1
+                );
 
-        const file = event.dataTransfer?.files?.[0];
+            if (dragDepth === 0) {
 
-        if (!file) return;
+                dropOverlay.classList.add(
+                    "hidden"
+                );
+            }
+        }
+    );
 
-        if (isProcessing) {
+    document.addEventListener(
+        "drop",
+        event => {
 
-            showToast(
-                "Please wait for the current analysis to finish.",
-                "warning"
+            dragDepth = 0;
+
+            dropOverlay.classList.add(
+                "hidden"
             );
 
-            return;
-        }
+            const file =
+                event.dataTransfer
+                    ?.files?.[0];
 
-        routeDroppedFile(file);
-    });
+            if (!file) {
+                return;
+            }
+
+            if (isProcessing) {
+
+                showToast(
+                    "Please wait for the current analysis to finish.",
+                    "warning"
+                );
+
+                return;
+            }
+
+            routeDroppedFile(file);
+        }
+    );
 }
 
 
@@ -2486,20 +2313,15 @@ function setupDragAndDrop() {
 
 function toggleMenu() {
 
-    const menu =
-        $("menu");
-
-    const plus =
-        $("plusButton");
+    const menu = $("menu");
+    const plus = $("plusButton");
 
     if (!menu) {
         return;
     }
 
     const opening =
-        !menu.classList.contains(
-            "open"
-        );
+        !menu.classList.contains("open");
 
     menu.classList.toggle(
         "open",
@@ -2523,11 +2345,8 @@ function toggleMenu() {
 
 function closeUploadMenu() {
 
-    const menu =
-        $("menu");
-
-    const plus =
-        $("plusButton");
+    const menu = $("menu");
+    const plus = $("plusButton");
 
     if (menu) {
 
@@ -2567,10 +2386,8 @@ async function openCamera() {
     const status =
         $("cameraStatus");
 
-    if (
-        !modal ||
-        !preview
-    ) {
+    if (!modal || !preview) {
+
         showToast(
             "Camera interface is unavailable.",
             "error"
@@ -2579,22 +2396,10 @@ async function openCamera() {
         return;
     }
 
-
-    /*
-     * First make the modal visible.
-     */
-
-    modal.classList.remove(
-        "hidden"
-    );
+    modal.classList.remove("hidden");
 
     document.body.style.overflow =
         "hidden";
-
-
-    /*
-     * Reset previous capture.
-     */
 
     resetCameraReview();
 
@@ -2627,42 +2432,35 @@ async function openCamera() {
                 "Requesting camera permission...";
         }
 
-
         cameraStream =
             await navigator.mediaDevices.getUserMedia({
 
                 video: {
 
                     facingMode: {
-                        ideal:
-                            "environment"
+                        ideal: "environment"
                     },
 
                     width: {
-                        ideal:
-                            1280
+                        ideal: 1280
                     },
 
                     height: {
-                        ideal:
-                            720
+                        ideal: 720
                     }
                 },
 
-                audio:
-                    false
-            });
+                audio: false
 
+            });
 
         preview.srcObject =
             cameraStream;
-
 
         await preview.play()
             .catch(
                 () => {}
             );
-
 
         if (status) {
 
@@ -2670,14 +2468,12 @@ async function openCamera() {
                 "Point the camera at readable text.";
         }
 
-
     } catch (error) {
 
         console.error(
             "Camera error:",
             error
         );
-
 
         let message =
             "Unable to access the camera.";
@@ -2718,13 +2514,11 @@ async function openCamera() {
                 "Camera access requires a secure connection such as HTTPS or localhost.";
         }
 
-
         if (status) {
 
             status.textContent =
                 message;
         }
-
 
         showToast(
             message,
@@ -2770,9 +2564,7 @@ function captureCamera() {
         return;
     }
 
-
-    const maxWidth =
-        1600;
+    const maxWidth = 1600;
 
     const scale =
         Math.min(
@@ -2793,11 +2585,8 @@ function captureCamera() {
             scale
         );
 
-
     const ctx =
-        canvas.getContext(
-            "2d"
-        );
+        canvas.getContext("2d");
 
     if (!ctx) {
 
@@ -2809,7 +2598,6 @@ function captureCamera() {
         return;
     }
 
-
     ctx.drawImage(
         preview,
         0,
@@ -2817,7 +2605,6 @@ function captureCamera() {
         canvas.width,
         canvas.height
     );
-
 
     canvas.toBlob(
         blob => {
@@ -2832,23 +2619,17 @@ function captureCamera() {
                 return;
             }
 
-
             capturedCameraBlob =
                 blob;
 
-
             const url =
-                URL.createObjectURL(
-                    blob
-                );
-
+                URL.createObjectURL(blob);
 
             if (capturedImage) {
 
                 capturedImage.src =
                     url;
             }
-
 
             if (review) {
 
@@ -2857,29 +2638,24 @@ function captureCamera() {
                 );
             }
 
-
             preview.classList.add(
                 "hidden"
             );
-
 
             $("captureButton")
                 ?.classList.add(
                     "hidden"
                 );
 
-
             $("retakeButton")
                 ?.classList.remove(
                     "hidden"
                 );
 
-
             $("confirmButton")
                 ?.classList.remove(
                     "hidden"
                 );
-
 
             if (status) {
 
@@ -2887,18 +2663,17 @@ function captureCamera() {
                     "Check the photo, then tap Use Photo.";
             }
 
-
             stopCameraStream();
 
         },
         "image/jpeg",
-        .92
+        0.92
     );
 }
 
 
 /* =========================================================
-   RETAKE
+   RETAKE CAMERA
 ========================================================= */
 
 async function retakeCamera() {
@@ -2928,33 +2703,29 @@ async function startCameraStream() {
         return;
     }
 
-
     try {
 
         cameraStream =
             await navigator.mediaDevices.getUserMedia({
 
                 video: {
+
                     facingMode: {
-                        ideal:
-                            "environment"
+                        ideal: "environment"
                     },
 
                     width: {
-                        ideal:
-                            1280
+                        ideal: 1280
                     },
 
                     height: {
-                        ideal:
-                            720
+                        ideal: 720
                     }
                 },
 
                 audio: false
 
             });
-
 
         preview.srcObject =
             cameraStream;
@@ -3005,10 +2776,8 @@ async function confirmCameraCapture() {
         return;
     }
 
-
     const status =
         $("cameraStatus");
-
 
     if (status) {
 
@@ -3016,26 +2785,16 @@ async function confirmCameraCapture() {
             "Processing captured image...";
     }
 
-
     const file =
         new File(
-            [
-                capturedCameraBlob
-            ],
+            [capturedCameraBlob],
             `reviewwise-camera-${Date.now()}.jpg`,
             {
-                type:
-                    "image/jpeg"
+                type: "image/jpeg"
             }
         );
 
-
     closeCamera();
-
-
-    /*
-     * Automatically run Tesseract OCR.
-     */
 
     try {
 
@@ -3092,9 +2851,7 @@ function resetCameraReview() {
 
         if (
             captured.src &&
-            captured.src.startsWith(
-                "blob:"
-            )
+            captured.src.startsWith("blob:")
         ) {
 
             URL.revokeObjectURL(
@@ -3107,9 +2864,7 @@ function resetCameraReview() {
         );
     }
 
-    capturedCameraBlob =
-        null;
-
+    capturedCameraBlob = null;
 
     $("captureButton")
         ?.classList.remove(
@@ -3141,23 +2896,17 @@ function stopCameraStream() {
     cameraStream
         .getTracks()
         .forEach(
-            track => {
-
-                track.stop();
-
-            }
+            track => track.stop()
         );
 
-    cameraStream =
-        null;
+    cameraStream = null;
 
     const preview =
         $("cameraPreview");
 
     if (preview) {
 
-        preview.srcObject =
-            null;
+        preview.srcObject = null;
     }
 }
 
@@ -3182,9 +2931,7 @@ function closeCamera() {
         );
     }
 
-    document.body.style.overflow =
-        "";
-
+    document.body.style.overflow = "";
 }
 
 
@@ -3233,11 +2980,8 @@ function setupPhoto() {
                 return;
             }
 
-
             if (
-                !file.type.startsWith(
-                    "image/"
-                )
+                !file.type.startsWith("image/")
             ) {
 
                 showToast(
@@ -3249,7 +2993,6 @@ function setupPhoto() {
 
                 return;
             }
-
 
             try {
 
@@ -3267,8 +3010,7 @@ function setupPhoto() {
 
             } finally {
 
-                this.value =
-                    "";
+                this.value = "";
             }
         }
     );
@@ -3279,9 +3021,7 @@ function setupPhoto() {
    SHOW IMAGE PREVIEW
 ========================================================= */
 
-function showImagePreview(
-    file
-) {
+function showImagePreview(file) {
 
     const imageContainer =
         $("imageContainer");
@@ -3293,29 +3033,21 @@ function showImagePreview(
         return;
     }
 
-
-    if (
-        currentPreviewObjectURL
-    ) {
+    if (currentPreviewObjectURL) {
 
         URL.revokeObjectURL(
             currentPreviewObjectURL
         );
     }
 
-
     const imageURL =
-        URL.createObjectURL(
-            file
-        );
+        URL.createObjectURL(file);
 
     currentPreviewObjectURL =
         imageURL;
 
-
     previewImage.src =
         imageURL;
-
 
     if (imageContainer) {
 
@@ -3324,32 +3056,24 @@ function showImagePreview(
         );
     }
 
-
-    hideOtherPreviews(
-        "image"
-    );
+    hideOtherPreviews("image");
 }
 
 
 /* =========================================================
-   IMAGE PREPROCESSING
-   =========================================================
-   Loads the image once onto a working canvas (resized,
-   rotation-safe) and then produces several preprocessing
-   VARIANTS from that same canvas so multi-pass OCR can pick
-   the best result. The user's original uploaded file is
-   never modified — only in-memory copies are processed.
+   LOAD IMAGE TO CANVAS
 ========================================================= */
 
-async function loadImageToCanvas(
-    file
-) {
+async function loadImageToCanvas(file) {
 
     return new Promise(
         (resolve, reject) => {
 
-            const img = new Image();
-            const url = URL.createObjectURL(file);
+            const img =
+                new Image();
+
+            const url =
+                URL.createObjectURL(file);
 
             img.onload = () => {
 
@@ -3368,37 +3092,84 @@ async function loadImageToCanvas(
                     );
 
                 const canvas =
-                    document.createElement("canvas");
+                    document.createElement(
+                        "canvas"
+                    );
 
                 canvas.width =
-                    Math.max(1, Math.round(img.naturalWidth * scale));
+                    Math.max(
+                        1,
+                        Math.round(
+                            img.naturalWidth *
+                            scale
+                        )
+                    );
 
                 canvas.height =
-                    Math.max(1, Math.round(img.naturalHeight * scale));
+                    Math.max(
+                        1,
+                        Math.round(
+                            img.naturalHeight *
+                            scale
+                        )
+                    );
 
                 const ctx =
-                    canvas.getContext("2d", { willReadFrequently: true });
+                    canvas.getContext(
+                        "2d",
+                        {
+                            willReadFrequently:
+                                true
+                        }
+                    );
 
                 if (!ctx) {
-                    reject(new Error("Canvas is not supported."));
+
+                    reject(
+                        new Error(
+                            "Canvas is not supported."
+                        )
+                    );
+
                     return;
                 }
 
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = "high";
+                ctx.imageSmoothingEnabled =
+                    true;
 
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                ctx.imageSmoothingQuality =
+                    "high";
+
+                ctx.drawImage(
+                    img,
+                    0,
+                    0,
+                    canvas.width,
+                    canvas.height
+                );
 
                 resolve({
+
                     canvas,
-                    naturalWidth: img.naturalWidth,
-                    naturalHeight: img.naturalHeight
+
+                    naturalWidth:
+                        img.naturalWidth,
+
+                    naturalHeight:
+                        img.naturalHeight
+
                 });
             };
 
             img.onerror = () => {
+
                 URL.revokeObjectURL(url);
-                reject(new Error("Unable to load image."));
+
+                reject(
+                    new Error(
+                        "Unable to load image."
+                    )
+                );
             };
 
             img.src = url;
@@ -3406,16 +3177,31 @@ async function loadImageToCanvas(
     );
 }
 
+
+/* =========================================================
+   CLONE IMAGE DATA
+========================================================= */
+
 function cloneImageData(
     ctx,
     canvas
 ) {
-    return ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    return ctx.getImageData(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
 }
 
-function canvasToBlob(
-    canvas
-) {
+
+/* =========================================================
+   CANVAS TO BLOB
+========================================================= */
+
+function canvasToBlob(canvas) {
+
     return new Promise(
         (resolve, reject) => {
 
@@ -3423,7 +3209,13 @@ function canvasToBlob(
                 blob => {
 
                     if (!blob) {
-                        reject(new Error("Unable to preprocess image."));
+
+                        reject(
+                            new Error(
+                                "Unable to preprocess image."
+                            )
+                        );
+
                         return;
                     }
 
@@ -3435,68 +3227,123 @@ function canvasToBlob(
     );
 }
 
+
+/* =========================================================
+   GRAYSCALE + CONTRAST
+========================================================= */
+
 function applyGrayscaleContrast(
     data,
     contrast = 1.45,
     midpoint = 128
 ) {
 
-    for (let i = 0; i < data.length; i += 4) {
+    for (
+        let i = 0;
+        i < data.length;
+        i += 4
+    ) {
 
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
 
-        let gray = (.299 * r + .587 * g + .114 * b);
+        let gray =
+            (
+                0.299 * r +
+                0.587 * g +
+                0.114 * b
+            );
 
-        gray = (gray - midpoint) * contrast + midpoint;
+        gray =
+            (
+                gray -
+                midpoint
+            ) *
+            contrast +
+            midpoint;
 
-        gray = Math.max(0, Math.min(255, gray));
+        gray =
+            Math.max(
+                0,
+                Math.min(
+                    255,
+                    gray
+                )
+            );
 
-        data[i] = gray;
-        data[i + 1] = gray;
-        data[i + 2] = gray;
+        data[i] =
+            gray;
+
+        data[i + 1] =
+            gray;
+
+        data[i + 2] =
+            gray;
     }
 
     return data;
 }
+
+
+/* =========================================================
+   THRESHOLD
+========================================================= */
 
 function applyThreshold(
     data,
     threshold = 150
 ) {
 
-    for (let i = 0; i < data.length; i += 4) {
+    for (
+        let i = 0;
+        i < data.length;
+        i += 4
+    ) {
 
         const gray =
-            .299 * data[i] +
-            .587 * data[i + 1] +
-            .114 * data[i + 2];
+            0.299 * data[i] +
+            0.587 * data[i + 1] +
+            0.114 * data[i + 2];
 
-        const value = gray >= threshold ? 255 : 0;
+        const value =
+            gray >= threshold
+                ? 255
+                : 0;
 
-        data[i] = value;
-        data[i + 1] = value;
-        data[i + 2] = value;
+        data[i] =
+            value;
+
+        data[i + 1] =
+            value;
+
+        data[i + 2] =
+            value;
     }
 
     return data;
 }
+
+
+/* =========================================================
+   SHARPEN
+========================================================= */
 
 function applySharpen(
     imageData,
     canvas
 ) {
 
-    /*
-     * Simple 3x3 sharpen convolution kernel.
-     * Runs on the grayscale/contrast data for speed.
-     */
-
     const w = canvas.width;
     const h = canvas.height;
-    const src = imageData.data;
-    const out = new Uint8ClampedArray(src.length);
+
+    const src =
+        imageData.data;
+
+    const out =
+        new Uint8ClampedArray(
+            src.length
+        );
 
     const kernel = [
         0, -1, 0,
@@ -3504,39 +3351,100 @@ function applySharpen(
         0, -1, 0
     ];
 
-    for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
+    for (
+        let y = 0;
+        y < h;
+        y++
+    ) {
 
-            const idx = (y * w + x) * 4;
+        for (
+            let x = 0;
+            x < w;
+            x++
+        ) {
 
-            if (x === 0 || y === 0 || x === w - 1 || y === h - 1) {
+            const idx =
+                (
+                    y * w +
+                    x
+                ) * 4;
 
-                out[idx] = src[idx];
-                out[idx + 1] = src[idx + 1];
-                out[idx + 2] = src[idx + 2];
-                out[idx + 3] = src[idx + 3];
+            if (
+                x === 0 ||
+                y === 0 ||
+                x === w - 1 ||
+                y === h - 1
+            ) {
+
+                out[idx] =
+                    src[idx];
+
+                out[idx + 1] =
+                    src[idx + 1];
+
+                out[idx + 2] =
+                    src[idx + 2];
+
+                out[idx + 3] =
+                    src[idx + 3];
+
                 continue;
             }
 
             let sum = 0;
             let k = 0;
 
-            for (let ky = -1; ky <= 1; ky++) {
-                for (let kx = -1; kx <= 1; kx++) {
+            for (
+                let ky = -1;
+                ky <= 1;
+                ky++
+            ) {
 
-                    const nIdx = ((y + ky) * w + (x + kx)) * 4;
+                for (
+                    let kx = -1;
+                    kx <= 1;
+                    kx++
+                ) {
 
-                    sum += src[nIdx] * kernel[k];
+                    const nIdx =
+                        (
+                            (
+                                y + ky
+                            ) *
+                            w +
+                            (
+                                x + kx
+                            )
+                        ) * 4;
+
+                    sum +=
+                        src[nIdx] *
+                        kernel[k];
+
                     k++;
                 }
             }
 
-            const value = Math.max(0, Math.min(255, sum));
+            const value =
+                Math.max(
+                    0,
+                    Math.min(
+                        255,
+                        sum
+                    )
+                );
 
-            out[idx] = value;
-            out[idx + 1] = value;
-            out[idx + 2] = value;
-            out[idx + 3] = src[idx + 3];
+            out[idx] =
+                value;
+
+            out[idx + 1] =
+                value;
+
+            out[idx + 2] =
+                value;
+
+            out[idx + 3] =
+                src[idx + 3];
         }
     }
 
@@ -3545,90 +3453,183 @@ function applySharpen(
     return imageData;
 }
 
-/*
- * Builds up to 3 OCR-ready image variants from a single decode
- * of the source file. Capped at 3 (rather than every possible
- * combination) to keep multi-pass OCR fast enough for mobile —
- * see performance requirements.
- */
-async function buildOcrVariants(
-    file
-) {
 
-    const { canvas, naturalWidth, naturalHeight } =
+/* =========================================================
+   BUILD OCR VARIANTS
+========================================================= */
+
+async function buildOcrVariants(file) {
+
+    const {
+        canvas,
+        naturalWidth,
+        naturalHeight
+    } =
         await loadImageToCanvas(file);
 
     const ctx =
-        canvas.getContext("2d", { willReadFrequently: true });
+        canvas.getContext(
+            "2d",
+            {
+                willReadFrequently:
+                    true
+            }
+        );
 
     const variants = [];
 
-    /* PASS 1 — grayscale + contrast (best general-purpose pass) */
+
+    /* PASS 1 */
+
     {
-        const data = cloneImageData(ctx, canvas);
-        applyGrayscaleContrast(data.data, 1.45, 128);
-        ctx.putImageData(data, 0, 0);
+
+        const data =
+            cloneImageData(
+                ctx,
+                canvas
+            );
+
+        applyGrayscaleContrast(
+            data.data,
+            1.45,
+            128
+        );
+
+        ctx.putImageData(
+            data,
+            0,
+            0
+        );
+
         variants.push({
+
             name: "contrast",
-            blob: await canvasToBlob(canvas)
+
+            blob:
+                await canvasToBlob(
+                    canvas
+                )
+
         });
     }
 
-    /* PASS 2 — binarized / thresholded (best for flat screenshots) */
+
+    /* PASS 2 */
+
     {
-        const data = cloneImageData(ctx, canvas);
-        applyThreshold(data.data, 150);
-        ctx.putImageData(data, 0, 0);
+
+        const data =
+            cloneImageData(
+                ctx,
+                canvas
+            );
+
+        applyThreshold(
+            data.data,
+            150
+        );
+
+        ctx.putImageData(
+            data,
+            0,
+            0
+        );
+
         variants.push({
+
             name: "threshold",
-            blob: await canvasToBlob(canvas)
+
+            blob:
+                await canvasToBlob(
+                    canvas
+                )
+
         });
     }
 
-    /* PASS 3 — sharpened grayscale (best for slightly blurry photos) */
+
+    /* PASS 3 */
+
     {
-        const data = cloneImageData(ctx, canvas);
-        applyGrayscaleContrast(data.data, 1.2, 128);
-        applySharpen(data, canvas);
-        ctx.putImageData(data, 0, 0);
+
+        const data =
+            cloneImageData(
+                ctx,
+                canvas
+            );
+
+        applyGrayscaleContrast(
+            data.data,
+            1.2,
+            128
+        );
+
+        applySharpen(
+            data,
+            canvas
+        );
+
+        ctx.putImageData(
+            data,
+            0,
+            0
+        );
+
         variants.push({
+
             name: "sharpened",
-            blob: await canvasToBlob(canvas)
+
+            blob:
+                await canvasToBlob(
+                    canvas
+                )
+
         });
     }
 
-    return { variants, naturalWidth, naturalHeight };
+
+    return {
+
+        variants,
+
+        naturalWidth,
+
+        naturalHeight
+
+    };
 }
 
-/*
- * Kept for backward compatibility with any external callers —
- * returns just the primary (contrast-enhanced) variant.
- */
-async function preprocessImage(
-    file
-) {
 
-    const { variants } = await buildOcrVariants(file);
+/* =========================================================
+   PREPROCESS IMAGE
+========================================================= */
+
+async function preprocessImage(file) {
+
+    const {
+        variants
+    } =
+        await buildOcrVariants(file);
+
     return variants[0].blob;
 }
 
 
 /* =========================================================
-   PRE-OCR IMAGE QUALITY CHECK
-   =========================================================
-   Lightweight heuristics (no ML) that catch the most common
-   OCR-defeating problems before we spend time running OCR.
+   ASSESS IMAGE QUALITY
 ========================================================= */
 
-async function assessImageQuality(
-    file
-) {
+async function assessImageQuality(file) {
 
     const warnings = [];
 
     try {
 
-        const { canvas, naturalWidth, naturalHeight } =
+        const {
+            canvas,
+            naturalWidth,
+            naturalHeight
+        } =
             await loadImageToCanvas(file);
 
         if (
@@ -3642,137 +3643,248 @@ async function assessImageQuality(
         }
 
         const ctx =
-            canvas.getContext("2d", { willReadFrequently: true });
+            canvas.getContext(
+                "2d",
+                {
+                    willReadFrequently:
+                        true
+                }
+            );
 
-        /* Downscale sample for speed */
-        const sampleW = Math.min(200, canvas.width);
+        const sampleW =
+            Math.min(
+                200,
+                canvas.width
+            );
+
         const sampleH =
             Math.max(
                 1,
-                Math.round(sampleW * (canvas.height / canvas.width))
+                Math.round(
+                    sampleW *
+                    (
+                        canvas.height /
+                        canvas.width
+                    )
+                )
             );
 
         const sampleCanvas =
-            document.createElement("canvas");
+            document.createElement(
+                "canvas"
+            );
 
-        sampleCanvas.width = sampleW;
-        sampleCanvas.height = sampleH;
+        sampleCanvas.width =
+            sampleW;
+
+        sampleCanvas.height =
+            sampleH;
 
         const sampleCtx =
-            sampleCanvas.getContext("2d", { willReadFrequently: true });
+            sampleCanvas.getContext(
+                "2d",
+                {
+                    willReadFrequently:
+                        true
+                }
+            );
 
-        sampleCtx.drawImage(canvas, 0, 0, sampleW, sampleH);
+        sampleCtx.drawImage(
+            canvas,
+            0,
+            0,
+            sampleW,
+            sampleH
+        );
 
         const data =
-            sampleCtx.getImageData(0, 0, sampleW, sampleH).data;
+            sampleCtx.getImageData(
+                0,
+                0,
+                sampleW,
+                sampleH
+            ).data;
 
         let brightnessSum = 0;
         let gradientSum = 0;
-        const gray = new Float32Array(sampleW * sampleH);
 
-        for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+        const gray =
+            new Float32Array(
+                sampleW *
+                sampleH
+            );
+
+        for (
+            let i = 0,
+            p = 0;
+            i < data.length;
+            i += 4,
+            p++
+        ) {
 
             const g =
-                .299 * data[i] + .587 * data[i + 1] + .114 * data[i + 2];
+                0.299 * data[i] +
+                0.587 * data[i + 1] +
+                0.114 * data[i + 2];
 
             gray[p] = g;
+
             brightnessSum += g;
         }
 
-        const avgBrightness = brightnessSum / gray.length;
+        const avgBrightness =
+            brightnessSum /
+            gray.length;
 
-        for (let y = 1; y < sampleH - 1; y++) {
-            for (let x = 1; x < sampleW - 1; x++) {
+        for (
+            let y = 1;
+            y < sampleH - 1;
+            y++
+        ) {
 
-                const idx = y * sampleW + x;
+            for (
+                let x = 1;
+                x < sampleW - 1;
+                x++
+            ) {
 
-                const gx = gray[idx + 1] - gray[idx - 1];
-                const gy = gray[idx + sampleW] - gray[idx - sampleW];
+                const idx =
+                    y *
+                    sampleW +
+                    x;
 
-                gradientSum += Math.abs(gx) + Math.abs(gy);
+                const gx =
+                    gray[idx + 1] -
+                    gray[idx - 1];
+
+                const gy =
+                    gray[idx + sampleW] -
+                    gray[idx - sampleW];
+
+                gradientSum +=
+                    Math.abs(gx) +
+                    Math.abs(gy);
             }
         }
 
         const sharpnessScore =
-            gradientSum / (sampleW * sampleH);
+            gradientSum /
+            (
+                sampleW *
+                sampleH
+            );
 
-        if (avgBrightness < 55) {
+        if (
+            avgBrightness < 55
+        ) {
+
             warnings.push(
                 "This image looks very dark. OCR accuracy may be reduced."
             );
-        } else if (avgBrightness > 225) {
+
+        } else if (
+            avgBrightness > 225
+        ) {
+
             warnings.push(
                 "This image looks overexposed. OCR accuracy may be reduced."
             );
         }
 
-        if (sharpnessScore < 6) {
+        if (
+            sharpnessScore < 6
+        ) {
+
             warnings.push(
                 "This image appears blurry or low in detail. OCR accuracy may be reduced."
             );
         }
 
-        return { warnings, naturalWidth, naturalHeight };
+        return {
+
+            warnings,
+
+            naturalWidth,
+
+            naturalHeight
+
+        };
 
     } catch (error) {
 
-        console.error("Image quality check failed:", error);
-        return { warnings, naturalWidth: null, naturalHeight: null };
+        console.error(
+            "Image quality check failed:",
+            error
+        );
+
+        return {
+
+            warnings,
+
+            naturalWidth: null,
+
+            naturalHeight: null
+
+        };
     }
 }
 
 
 /* =========================================================
    CLEAN OCR TEXT
-   =========================================================
-   Conservative cleanup only: fixes whitespace/line-break
-   noise and obvious repeated-character artifacts. Never
-   rewrites words, so the cleaned text stays faithful to
-   what the image actually shows.
 ========================================================= */
 
-function cleanOCRText(
-    text
-) {
+function cleanOCRText(text) {
 
     if (!text) {
         return "";
     }
 
-    let cleaned = String(text)
+    return String(text)
 
         .normalize("NFKC")
 
-        .replace(/[\u0000-\u001F\u007F]/g, " ")
+        .replace(
+            /[\u0000-\u001F\u007F]/g,
+            " "
+        )
 
-        /* Rejoin words that were hyphen-broken across a line break */
-        .replace(/([A-Za-z])-\n([A-Za-z])/g, "$1$2")
+        .replace(
+            /([A-Za-z])-\n([A-Za-z])/g,
+            "$1$2"
+        )
 
-        .replace(/[ \t]+/g, " ")
+        .replace(
+            /[ \t]+/g,
+            " "
+        )
 
-        .replace(/\s+([,.!?;:])/g, "$1")
+        .replace(
+            /\s+([,.!?;:])/g,
+            "$1"
+        )
 
-        .replace(/\n[ \t]+/g, "\n")
+        .replace(
+            /\n[ \t]+/g,
+            "\n"
+        )
 
-        .replace(/\n{3,}/g, "\n\n")
+        .replace(
+            /\n{3,}/g,
+            "\n\n"
+        )
 
-        /* Collapse 4+ repeated identical characters (common OCR
-           artifact, e.g. "----" or "»»»»") down to 2 */
-        .replace(/([^\w\s])\1{3,}/g, "$1$1")
+        .replace(
+            /([^\w\s])\1{3,}/g,
+            "$1$1"
+        )
 
         .trim();
-
-    return cleaned;
 }
 
 
 /* =========================================================
    OCR QUALITY SCORING
-   =========================================================
-   Produces a 0-100 "how much should we trust this text"
-   score from the OCR engine confidence PLUS text-shape
-   heuristics — not just whatever confidence value the OCR
-   engine reports.
 ========================================================= */
 
 function computeOcrQuality(
@@ -3780,65 +3892,106 @@ function computeOcrQuality(
     engineConfidence
 ) {
 
-    const clean = String(text || "").trim();
+    const clean =
+        String(text || "").trim();
 
     if (!clean) {
 
         return {
+
             score: 0,
+
             label: "Poor",
-            reasons: ["No readable text was found."]
+
+            reasons: [
+                "No readable text was found."
+            ]
+
         };
     }
 
     const letters =
-        (clean.match(/[A-Za-z]/g) || []).length;
+        (
+            clean.match(
+                /[A-Za-z]/g
+            ) || []
+        ).length;
 
     const digits =
-        (clean.match(/[0-9]/g) || []).length;
+        (
+            clean.match(
+                /[0-9]/g
+            ) || []
+        ).length;
 
-    const total = clean.length;
+    const total =
+        clean.length;
 
     const alphaRatio =
-        total > 0 ? (letters + digits) / total : 0;
+        total > 0
+            ? (
+                letters +
+                digits
+            ) / total
+            : 0;
 
     const weirdSymbols =
-        (clean.match(/[^\w\s.,!?;:'"()\-%$@#&/]/g) || []).length;
+        (
+            clean.match(
+                /[^\w\s.,!?;:'"()\-%$@#&/]/g
+            ) || []
+        ).length;
 
     const weirdRatio =
-        total > 0 ? weirdSymbols / total : 0;
+        total > 0
+            ? weirdSymbols / total
+            : 0;
 
     const words =
-        clean.split(/\s+/).filter(Boolean);
+        clean
+            .split(/\s+/)
+            .filter(Boolean);
 
     const dictionaryLikeWords =
         words.filter(
-            w => /^[A-Za-z][A-Za-z'-]{1,}$/.test(w)
+            w =>
+                /^[A-Za-z][A-Za-z'-]{1,}$/.test(w)
         ).length;
 
     const wordValidityRatio =
         words.length > 0
-            ? dictionaryLikeWords / words.length
+            ? dictionaryLikeWords /
+                words.length
             : 0;
 
     const excessiveSpacing =
-        (clean.match(/ {3,}/g) || []).length;
-
-    /*
-     * Blend: engine confidence carries the most weight,
-     * then character composition, then word shape.
-     */
+        (
+            clean.match(
+                / {3,}/g
+            ) || []
+        ).length;
 
     const confidence =
-        Number.isFinite(engineConfidence)
-            ? Math.max(0, Math.min(100, engineConfidence))
-            : 55; // neutral default when engine gives no confidence
+        Number.isFinite(
+            engineConfidence
+        )
+            ? Math.max(
+                0,
+                Math.min(
+                    100,
+                    engineConfidence
+                )
+            )
+            : 55;
 
     let score =
-        (confidence * 0.45) +
-        (alphaRatio * 100 * 0.25) +
-        (wordValidityRatio * 100 * 0.2) +
-        (Math.max(0, 1 - weirdRatio * 4) * 100 * 0.1);
+        confidence * 0.45 +
+        alphaRatio * 100 * 0.25 +
+        wordValidityRatio * 100 * 0.20 +
+        Math.max(
+            0,
+            1 - weirdRatio * 4
+        ) * 100 * 0.10;
 
     if (total < 8) {
         score -= 15;
@@ -3848,49 +4001,90 @@ function computeOcrQuality(
         score -= 5;
     }
 
-    score = Math.max(0, Math.min(100, Math.round(score)));
+    score =
+        Math.max(
+            0,
+            Math.min(
+                100,
+                Math.round(score)
+            )
+        );
 
     let label = "Poor";
 
-    if (score >= 85) label = "Excellent";
-    else if (score >= 70) label = "Good";
-    else if (score >= 45) label = "Fair";
-    else label = "Poor";
+    if (score >= 85) {
+        label = "Excellent";
+    }
+
+    else if (score >= 70) {
+        label = "Good";
+    }
+
+    else if (score >= 45) {
+        label = "Fair";
+    }
 
     const reasons = [];
 
     if (alphaRatio < 0.6) {
-        reasons.push("Many non-letter/number characters were detected.");
+
+        reasons.push(
+            "Many non-letter/number characters were detected."
+        );
     }
 
-    if (wordValidityRatio < 0.5 && words.length > 3) {
-        reasons.push("Several extracted words don't look like real words.");
+    if (
+        wordValidityRatio < 0.5 &&
+        words.length > 3
+    ) {
+
+        reasons.push(
+            "Several extracted words don't look like real words."
+        );
     }
 
     if (weirdRatio > 0.1) {
-        reasons.push("Unusual symbols were found in the extracted text.");
+
+        reasons.push(
+            "Unusual symbols were found in the extracted text."
+        );
     }
 
-    return { score, label, reasons };
+    return {
+
+        score,
+
+        label,
+
+        reasons
+
+    };
 }
 
 
 /* =========================================================
-   UPDATE OCR REVIEW UI
+   OCR QUALITY UI
 ========================================================= */
 
-function updateOcrQualityUI(
-    quality
-) {
+function updateOcrQualityUI(quality) {
 
-    const row = $("ocrQualityRow");
-    const badge = $("ocrQualityBadge");
-    const warningBanner = $("ocrWarningBanner");
-    const warningText = $("ocrWarningText");
+    const row =
+        $("ocrQualityRow");
+
+    const badge =
+        $("ocrQualityBadge");
+
+    const warningBanner =
+        $("ocrWarningBanner");
+
+    const warningText =
+        $("ocrWarningText");
 
     if (row && badge) {
 
-        row.classList.remove("hidden");
+        row.classList.remove(
+            "hidden"
+        );
 
         badge.className =
             `ocr-quality-badge ${quality.label.toLowerCase()}`;
@@ -3899,48 +4093,87 @@ function updateOcrQualityUI(
             `OCR Quality: ${quality.score}% — ${quality.label}`;
     }
 
-    if (warningBanner && warningText) {
+    if (
+        warningBanner &&
+        warningText
+    ) {
 
         if (quality.score < 45) {
 
             warningText.textContent =
                 "⚠ OCR quality is low. The extracted text may contain errors. Try uploading a clearer image.";
 
-            warningBanner.classList.remove("hidden");
+            warningBanner.classList.remove(
+                "hidden"
+            );
 
         } else {
 
-            warningBanner.classList.add("hidden");
+            warningBanner.classList.add(
+                "hidden"
+            );
         }
     }
 }
+
+
+/* =========================================================
+   OCR REVIEW CARD
+========================================================= */
 
 function showOcrReviewCard(
     rawText,
     cleanedText
 ) {
 
-    const card = $("ocrReviewCard");
-    const textarea = $("ocrReviewText");
+    const card =
+        $("ocrReviewCard");
 
-    lastOcrRaw = rawText;
-    lastOcrClean = cleanedText;
+    const textarea =
+        $("ocrReviewText");
+
+    lastOcrRaw =
+        rawText;
+
+    lastOcrClean =
+        cleanedText;
 
     if (card) {
-        card.classList.remove("hidden");
+
+        card.classList.remove(
+            "hidden"
+        );
     }
 
     if (textarea) {
-        textarea.value = cleanedText;
+
+        textarea.value =
+            cleanedText;
     }
 }
 
+
 function hideOcrReviewCard() {
 
-    $("ocrReviewCard")?.classList.add("hidden");
-    $("ocrQualityRow")?.classList.add("hidden");
-    $("ocrWarningBanner")?.classList.add("hidden");
-    $("imageMeta")?.classList.add("hidden");
+    $("ocrReviewCard")
+        ?.classList.add(
+            "hidden"
+        );
+
+    $("ocrQualityRow")
+        ?.classList.add(
+            "hidden"
+        );
+
+    $("ocrWarningBanner")
+        ?.classList.add(
+            "hidden"
+        );
+
+    $("imageMeta")
+        ?.classList.add(
+            "hidden"
+        );
 
     lastOcrRaw = "";
     lastOcrClean = "";
@@ -3948,68 +4181,121 @@ function hideOcrReviewCard() {
     lastOcrSourceKind = null;
 }
 
+
+/* =========================================================
+   COPY OCR TEXT
+========================================================= */
+
 function copyOcrText() {
 
-    const textarea = $("ocrReviewText");
-    const text = textarea ? textarea.value : lastOcrClean;
+    const textarea =
+        $("ocrReviewText");
+
+    const text =
+        textarea
+            ? textarea.value
+            : lastOcrClean;
 
     if (!text) {
-        showToast("There's no extracted text to copy yet.", "warning");
+
+        showToast(
+            "There's no extracted text to copy yet.",
+            "warning"
+        );
+
         return;
     }
 
     navigator.clipboard
         ?.writeText(text)
-        .then(() => showToast("Copied!"))
-        .catch(() => showToast("Unable to copy text.", "error"));
+        .then(
+            () =>
+                showToast("Copied!")
+        )
+        .catch(
+            () =>
+                showToast(
+                    "Unable to copy text.",
+                    "error"
+                )
+        );
 }
+
+
+/* =========================================================
+   USE EXTRACTED TEXT
+========================================================= */
 
 function useExtractedText() {
 
-    const textarea = $("ocrReviewText");
-    const input = $("newsInput");
+    const textarea =
+        $("ocrReviewText");
 
-    if (!textarea || !input) return;
+    const input =
+        $("newsInput");
 
-    input.value = textarea.value;
+    if (!textarea || !input) {
+        return;
+    }
+
+    input.value =
+        textarea.value;
 
     updateCharacterCount();
     updateWordCount();
 
-    showToast("Extracted text applied to the input box.");
+    showToast(
+        "Extracted text applied to the input box."
+    );
 }
+
+
+/* =========================================================
+   ANALYZE CORRECTED OCR TEXT
+========================================================= */
 
 async function analyzeCorrectedText() {
 
-    const textarea = $("ocrReviewText");
+    const textarea =
+        $("ocrReviewText");
 
-    if (!textarea || !textarea.value.trim()) {
+    if (
+        !textarea ||
+        !textarea.value.trim()
+    ) {
 
-        showToast("Add some text before analyzing.", "warning");
+        showToast(
+            "Add some text before analyzing.",
+            "warning"
+        );
+
         return;
     }
 
-    const input = $("newsInput");
+    const input =
+        $("newsInput");
 
     if (input) {
-        input.value = textarea.value;
+
+        input.value =
+            textarea.value;
+
         updateCharacterCount();
         updateWordCount();
     }
 
     await analyzeTextInput(
         textarea.value.trim(),
-        { ocrQuality: lastOcrQuality }
+        {
+            ocrQuality:
+                lastOcrQuality
+        }
     );
 }
 
 
 /* =========================================================
-   MULTI-PASS OCR (TESSERACT)
-   =========================================================
-   Runs OCR across several preprocessing variants and keeps
-   the result with the highest computed OCR QUALITY score
-   (not just the first result returned).
+   MULTI-PASS OCR
 ========================================================= */
 
 async function runOCR(
@@ -4018,16 +4304,27 @@ async function runOCR(
 ) {
 
     if (!file) {
-        throw new Error("No image file provided.");
+
+        throw new Error(
+            "No image file provided."
+        );
     }
 
-    if (typeof Tesseract === "undefined") {
-        throw new Error("Tesseract.js is not loaded.");
+    if (
+        typeof Tesseract ===
+        "undefined"
+    ) {
+
+        throw new Error(
+            "Tesseract.js is not loaded."
+        );
     }
 
-    const newsInput = $("newsInput");
+    const newsInput =
+        $("newsInput");
 
     showImagePreview(file);
+
     hideOcrReviewCard();
 
     setStatus(
@@ -4037,40 +4334,67 @@ async function runOCR(
         true
     );
 
+
     try {
 
-        /* =================================================
-           PRE-OCR QUALITY CHECK
-        ================================================== */
+        /* IMAGE QUALITY */
 
-        setStatus("Checking image quality...", true);
+        setStatus(
+            "Checking image quality...",
+            true
+        );
 
-        const { warnings, naturalWidth, naturalHeight } =
-            await assessImageQuality(file);
+        const {
+            warnings,
+            naturalWidth,
+            naturalHeight
+        } =
+            await assessImageQuality(
+                file
+            );
 
-        updateImageMeta(file, naturalWidth, naturalHeight);
+        updateImageMeta(
+            file,
+            naturalWidth,
+            naturalHeight
+        );
 
         if (warnings.length > 0) {
-            showToast(warnings[0], "warning");
+
+            showToast(
+                warnings[0],
+                "warning"
+            );
         }
 
-        /* =================================================
-           BUILD PREPROCESSING VARIANTS
-        ================================================== */
 
-        setStatus("Enhancing image...", true);
+        /* PREPROCESS */
 
-        const { variants } = await buildOcrVariants(file);
+        setStatus(
+            "Enhancing image...",
+            true
+        );
 
-        /* =================================================
-           MULTI-PASS OCR
-        ================================================== */
+        const {
+            variants
+        } =
+            await buildOcrVariants(
+                file
+            );
+
+
+        /* OCR */
 
         let best = null;
 
-        for (let i = 0; i < variants.length; i++) {
+        for (
+            let i = 0;
+            i < variants.length;
+            i++
+        ) {
 
-            const variant = variants[i];
+            const variant =
+                variants[i];
 
             setStatus(
                 `Reading text... (pass ${i + 1} of ${variants.length})`,
@@ -4081,25 +4405,36 @@ async function runOCR(
 
             try {
 
-                result = await Tesseract.recognize(
-                    variant.blob,
-                    "eng",
-                    {
-                        logger: info => {
+                result =
+                    await Tesseract.recognize(
+                        variant.blob,
+                        "eng",
+                        {
 
-                            if (info.status === "recognizing text") {
+                            logger:
+                                info => {
 
-                                const progress =
-                                    Math.round((info.progress || 0) * 100);
+                                    if (
+                                        info.status ===
+                                        "recognizing text"
+                                    ) {
 
-                                setStatus(
-                                    `Reading text... (pass ${i + 1} of ${variants.length}) ${progress}%`,
-                                    true
-                                );
-                            }
+                                        const progress =
+                                            Math.round(
+                                                (
+                                                    info.progress ||
+                                                    0
+                                                ) * 100
+                                            );
+
+                                        setStatus(
+                                            `Reading text... (pass ${i + 1} of ${variants.length}) ${progress}%`,
+                                            true
+                                        );
+                                    }
+                                }
                         }
-                    }
-                );
+                    );
 
             } catch (passError) {
 
@@ -4111,82 +4446,139 @@ async function runOCR(
                 continue;
             }
 
-            const rawText = result?.data?.text || "";
-            const cleanedText = cleanOCRText(rawText);
+            const rawText =
+                result?.data?.text ||
+                "";
+
+            const cleanedText =
+                cleanOCRText(
+                    rawText
+                );
 
             const engineConfidence =
-                Number.isFinite(result?.data?.confidence)
+                Number.isFinite(
+                    result?.data?.confidence
+                )
                     ? result.data.confidence
                     : null;
 
             const quality =
-                computeOcrQuality(cleanedText, engineConfidence);
+                computeOcrQuality(
+                    cleanedText,
+                    engineConfidence
+                );
 
-            if (!best || quality.score > best.quality.score) {
+            if (
+                !best ||
+                quality.score >
+                    best.quality.score
+            ) {
 
                 best = {
+
                     rawText,
+
                     cleanedText,
+
                     quality,
-                    variant: variant.name
+
+                    variant:
+                        variant.name
+
                 };
             }
 
-            /* Excellent result already — no need for more passes */
-            if (quality.score >= 90) {
+            if (
+                quality.score >= 90
+            ) {
+
                 break;
             }
         }
 
-        setStatus("Checking OCR quality...", true);
 
-        if (!best || !best.cleanedText || best.cleanedText.length < 2) {
+        setStatus(
+            "Checking OCR quality...",
+            true
+        );
+
+
+        if (
+            !best ||
+            !best.cleanedText ||
+            best.cleanedText.length < 2
+        ) {
 
             setStatus(
                 "Unable to read text from this image. Try using a clearer or brighter photo.",
                 true
             );
 
-            showToast("No readable text found.", "warning");
+            showToast(
+                "No readable text found.",
+                "warning"
+            );
 
             return;
         }
+
 
         console.log(
             `Best OCR pass: ${best.variant} (quality ${best.quality.score})`
         );
 
-        /* =================================================
-           SHOW RESULTS + REVIEW UI
-        ================================================== */
 
-        lastOcrSourceKind = source;
-        lastOcrQuality = best.quality.score;
+        /* OCR REVIEW */
 
-        showOcrReviewCard(best.rawText, best.cleanedText);
-        updateOcrQualityUI(best.quality);
+        lastOcrSourceKind =
+            source;
+
+        lastOcrQuality =
+            best.quality.score;
+
+        showOcrReviewCard(
+            best.rawText,
+            best.cleanedText
+        );
+
+        updateOcrQualityUI(
+            best.quality
+        );
+
 
         if (newsInput) {
-            newsInput.value = best.cleanedText;
+
+            newsInput.value =
+                best.cleanedText;
+
             updateCharacterCount();
             updateWordCount();
         }
 
-        setStatus("Analyzing credibility...", true);
+
+        setStatus(
+            "Analyzing credibility...",
+            true
+        );
+
 
         /*
-         * Important:
-         * Don't send the image to backend again.
          * Tesseract already extracted the text.
+         * We don't send the image again.
          */
 
         uploadedFile = null;
         uploadedFileKind = null;
 
+
         await analyzeTextInput(
             best.cleanedText,
-            { ocrQuality: best.quality.score }
+            {
+                ocrQuality:
+                    best.quality.score
+            }
         );
+
 
         showToast(
             best.quality.score < 45
@@ -4196,7 +4588,10 @@ async function runOCR(
 
     } catch (error) {
 
-        console.error("OCR ERROR:", error);
+        console.error(
+            "OCR ERROR:",
+            error
+        );
 
         setStatus(
             "Unable to read text from this image. Try using a clearer or brighter photo.",
@@ -4252,7 +4647,6 @@ function setupVideo() {
         return;
     }
 
-
     videoInput.addEventListener(
         "change",
         function () {
@@ -4263,7 +4657,6 @@ function setupVideo() {
             if (!file) {
                 return;
             }
-
 
             if (
                 !file.type.startsWith(
@@ -4281,13 +4674,11 @@ function setupVideo() {
                 return;
             }
 
-
             uploadedFile =
                 file;
 
             uploadedFileKind =
                 "video";
-
 
             if (
                 currentVideoObjectURL
@@ -4298,12 +4689,10 @@ function setupVideo() {
                 );
             }
 
-
             currentVideoObjectURL =
                 URL.createObjectURL(
                     file
                 );
-
 
             if (previewVideo) {
 
@@ -4313,7 +4702,6 @@ function setupVideo() {
                 previewVideo.load();
             }
 
-
             if (videoContainer) {
 
                 videoContainer.classList.remove(
@@ -4321,23 +4709,15 @@ function setupVideo() {
                 );
             }
 
-
-            hideOtherPreviews(
-                "video"
-            );
-
+            hideOtherPreviews("video");
 
             closeUploadMenu();
-
 
             showToast(
                 "Video ready. Tap Analyze Content."
             );
 
-
-            this.value =
-                "";
-
+            this.value = "";
         }
     );
 }
@@ -4364,7 +4744,6 @@ function showVideoProgress(
     const number =
         $("videoProgressPercent");
 
-
     if (area) {
 
         area.classList.remove(
@@ -4381,7 +4760,6 @@ function showVideoProgress(
             )
         );
 
-
     if (bar) {
 
         bar.style.width =
@@ -4391,7 +4769,8 @@ function showVideoProgress(
     if (label) {
 
         label.textContent =
-            text || "Scanning video...";
+            text ||
+            "Scanning video...";
     }
 
     if (number) {
@@ -4459,11 +4838,9 @@ function setupFile() {
     const fileContainer =
         $("fileContainer");
 
-
     if (!fileInput) {
         return;
     }
-
 
     fileInput.addEventListener(
         "change",
@@ -4476,21 +4853,17 @@ function setupFile() {
                 return;
             }
 
-
             const extension =
                 file.name
                     .split(".")
                     .pop()
                     ?.toLowerCase();
 
-
-            const supported =
-                [
-                    "pdf",
-                    "docx",
-                    "txt"
-                ];
-
+            const supported = [
+                "pdf",
+                "docx",
+                "txt"
+            ];
 
             if (
                 !supported.includes(
@@ -4508,13 +4881,11 @@ function setupFile() {
                 return;
             }
 
-
             uploadedFile =
                 file;
 
             uploadedFileKind =
                 "file";
-
 
             if (fileNamePreview) {
 
@@ -4522,13 +4893,11 @@ function setupFile() {
                     file.name;
             }
 
-
             if (fileTypePreview) {
 
                 fileTypePreview.textContent =
                     `${extension.toUpperCase()} • ${(file.size / 1024).toFixed(1)} KB`;
             }
-
 
             if (fileContainer) {
 
@@ -4537,23 +4906,15 @@ function setupFile() {
                 );
             }
 
-
-            hideOtherPreviews(
-                "file"
-            );
-
+            hideOtherPreviews("file");
 
             closeUploadMenu();
-
 
             showToast(
                 "File ready. Tap Analyze Content."
             );
 
-
-            this.value =
-                "";
-
+            this.value = "";
         }
     );
 }
@@ -4563,9 +4924,7 @@ function setupFile() {
    HIDE OTHER PREVIEWS
 ========================================================= */
 
-function hideOtherPreviews(
-    current
-) {
+function hideOtherPreviews(current) {
 
     const image =
         $("imageContainer");
@@ -4576,33 +4935,21 @@ function hideOtherPreviews(
     const file =
         $("fileContainer");
 
-
-    if (
-        current !==
-        "image"
-    ) {
+    if (current !== "image") {
 
         image?.classList.add(
             "hidden"
         );
     }
 
-
-    if (
-        current !==
-        "video"
-    ) {
+    if (current !== "video") {
 
         video?.classList.add(
             "hidden"
         );
     }
 
-
-    if (
-        current !==
-        "file"
-    ) {
+    if (current !== "file") {
 
         file?.classList.add(
             "hidden"
@@ -4612,41 +4959,33 @@ function hideOtherPreviews(
 
 
 /* =========================================================
-   REMOVE MEDIA
+   REMOVE CURRENT MEDIA
 ========================================================= */
 
 function removeCurrentMedia() {
 
-    uploadedFile =
-        null;
+    uploadedFile = null;
 
-    uploadedFileKind =
-        null;
+    uploadedFileKind = null;
 
 
-    if (
-        currentPreviewObjectURL
-    ) {
+    if (currentPreviewObjectURL) {
 
         URL.revokeObjectURL(
             currentPreviewObjectURL
         );
 
-        currentPreviewObjectURL =
-            null;
+        currentPreviewObjectURL = null;
     }
 
 
-    if (
-        currentVideoObjectURL
-    ) {
+    if (currentVideoObjectURL) {
 
         URL.revokeObjectURL(
             currentVideoObjectURL
         );
 
-        currentVideoObjectURL =
-            null;
+        currentVideoObjectURL = null;
     }
 
 
@@ -4705,9 +5044,7 @@ function removeCurrentMedia() {
    IMAGE HIGHLIGHT BOXES
 ========================================================= */
 
-function drawHighlightBoxes(
-    words
-) {
+function drawHighlightBoxes(words) {
 
     if (
         !Array.isArray(words) ||
@@ -4716,13 +5053,11 @@ function drawHighlightBoxes(
         return;
     }
 
-
     const previewImage =
         $("previewImage");
 
     const canvas =
         $("highlightCanvas");
-
 
     if (
         !previewImage ||
@@ -4731,15 +5066,11 @@ function drawHighlightBoxes(
         return;
     }
 
-
     function draw() {
 
-        if (
-            !previewImage.naturalWidth
-        ) {
+        if (!previewImage.naturalWidth) {
             return;
         }
-
 
         canvas.width =
             previewImage.naturalWidth;
@@ -4747,16 +5078,12 @@ function drawHighlightBoxes(
         canvas.height =
             previewImage.naturalHeight;
 
-
         const ctx =
-            canvas.getContext(
-                "2d"
-            );
+            canvas.getContext("2d");
 
         if (!ctx) {
             return;
         }
-
 
         ctx.clearRect(
             0,
@@ -4764,7 +5091,6 @@ function drawHighlightBoxes(
             canvas.width,
             canvas.height
         );
-
 
         ctx.lineWidth =
             Math.max(
@@ -4775,74 +5101,56 @@ function drawHighlightBoxes(
         ctx.strokeStyle =
             "#dc2626";
 
+        words.forEach(word => {
 
-        words.forEach(
-            word => {
+            const box =
+                word.bbox;
 
-                const box =
-                    word.bbox;
+            if (!box) {
+                return;
+            }
 
-                if (!box) {
-                    return;
-                }
+            const x0 =
+                Number(box.x0);
 
+            const y0 =
+                Number(box.y0);
 
-                const x0 =
-                    Number(
-                        box.x0
-                    );
+            const x1 =
+                Number(box.x1);
 
-                const y0 =
-                    Number(
-                        box.y0
-                    );
+            const y1 =
+                Number(box.y1);
 
-                const x1 =
-                    Number(
-                        box.x1
-                    );
-
-                const y1 =
-                    Number(
-                        box.y1
-                    );
-
-
-                if (
-                    ![
-                        x0,
-                        y0,
-                        x1,
-                        y1
-                    ].every(
-                        Number.isFinite
-                    )
-                ) {
-                    return;
-                }
-
-
-                ctx.strokeRect(
+            if (
+                ![
                     x0,
                     y0,
-                    Math.max(
-                        1,
-                        x1 - x0
-                    ),
-                    Math.max(
-                        1,
-                        y1 - y0
-                    )
-                );
-
+                    x1,
+                    y1
+                ].every(
+                    Number.isFinite
+                )
+            ) {
+                return;
             }
-        );
+
+            ctx.strokeRect(
+                x0,
+                y0,
+                Math.max(
+                    1,
+                    x1 - x0
+                ),
+                Math.max(
+                    1,
+                    y1 - y0
+                )
+            );
+        });
     }
 
-
-    if (
-        previewImage.complete
-    ) {
+    if (previewImage.complete) {
 
         draw();
 
@@ -4866,20 +5174,14 @@ function toggleSidebar() {
     const overlay =
         $("sidebarOverlay");
 
-
-    if (
-        !sidebar ||
-        !overlay
-    ) {
+    if (!sidebar || !overlay) {
         return;
     }
-
 
     const open =
         sidebar.classList.contains(
             "open"
         );
-
 
     if (open) {
 
@@ -4934,10 +5236,11 @@ function goHome() {
 
     if (input) {
 
-        input.value =
-            "";
+        input.value = "";
 
         updateCharacterCount();
+
+        updateWordCount();
     }
 
 
@@ -4950,6 +5253,7 @@ function goHome() {
             $(id)?.classList.add(
                 "hidden"
             );
+
         }
     );
 
@@ -4998,7 +5302,6 @@ function openHistory() {
     const container =
         $("historyList");
 
-
     if (
         !panel ||
         !container
@@ -5006,9 +5309,7 @@ function openHistory() {
         return;
     }
 
-
     renderHistory();
-
 
     panel.classList.remove(
         "hidden"
@@ -5035,29 +5336,23 @@ function renderHistory() {
         return;
     }
 
-
     const list =
         getHistory();
 
-
-    if (
-        list.length === 0
-    ) {
+    if (list.length === 0) {
 
         container.innerHTML = `
 
             <div class="empty-history">
 
-                <div class="empty-history-icon">
-                    🕘
-                </div>
+                <div class="empty-history-icon"></div>
 
                 <strong>
                     No checks yet
                 </strong>
 
                 <p>
-                    Your analyzed content will appear here.
+                    Your history will appear here.
                 </p>
 
             </div>
@@ -5100,7 +5395,8 @@ function renderHistory() {
                                     )}
                                 </span>
 
-                                <span class="history-score"
+                                <span
+                                    class="history-score"
                                     style="color:${getScoreColor(score)}">
 
                                     ${score}/100
@@ -5108,7 +5404,6 @@ function renderHistory() {
                                 </span>
 
                             </div>
-
 
                             <div
                                 class="history-status"
@@ -5119,7 +5414,6 @@ function renderHistory() {
                                 )}
 
                             </div>
-
 
                             <div class="history-preview">
 
@@ -5139,7 +5433,6 @@ function renderHistory() {
 
                             </div>
 
-
                             <div class="history-time">
 
                                 ${escapeHtml(
@@ -5148,7 +5441,6 @@ function renderHistory() {
                                 )}
 
                             </div>
-
 
                             <div class="history-actions">
 
@@ -5179,9 +5471,7 @@ function renderHistory() {
 }
 
 
-function openHistoryItem(
-    id
-) {
+function openHistoryItem(id) {
 
     const list =
         getHistory();
@@ -5191,7 +5481,6 @@ function openHistoryItem(
             entry =>
                 entry.id === id
         );
-
 
     if (!item) {
 
@@ -5203,9 +5492,7 @@ function openHistoryItem(
         return;
     }
 
-
     closePanels();
-
 
     const input =
         $("newsInput");
@@ -5216,15 +5503,13 @@ function openHistoryItem(
             item.text || "";
 
         updateCharacterCount();
+
+        updateWordCount();
     }
 
+    uploadedFile = null;
 
-    uploadedFile =
-        null;
-
-    uploadedFileKind =
-        null;
-
+    uploadedFileKind = null;
 
     renderAnalysis(
         item.analysis || {
@@ -5244,7 +5529,6 @@ function openHistoryItem(
         }
     );
 
-
     window.scrollTo({
         top: 0,
         behavior: "smooth"
@@ -5252,13 +5536,10 @@ function openHistoryItem(
 }
 
 
-function deleteHistoryItem(
-    id
-) {
+function deleteHistoryItem(id) {
 
     let list =
         getHistory();
-
 
     list =
         list.filter(
@@ -5266,14 +5547,10 @@ function deleteHistoryItem(
                 item.id !== id
         );
 
-
     localStorage.setItem(
         "reviewwiseHistory",
-        JSON.stringify(
-            list
-        )
+        JSON.stringify(list)
     );
-
 
     renderHistory();
 
@@ -5326,7 +5603,6 @@ function closePanels() {
     const about =
         $("aboutPanel");
 
-
     history?.classList.remove(
         "open"
     );
@@ -5334,7 +5610,6 @@ function closePanels() {
     about?.classList.remove(
         "open"
     );
-
 
     setTimeout(
         () => {
@@ -5368,11 +5643,9 @@ function clearHistory() {
         return;
     }
 
-
     localStorage.removeItem(
         "reviewwiseHistory"
     );
-
 
     closeSidebar();
 
@@ -5385,7 +5658,7 @@ function clearHistory() {
 
 
 /* =========================================================
-   CLOSE MENU WHEN CLICKING OUTSIDE
+   CLOSE MENU OUTSIDE
 ========================================================= */
 
 document.addEventListener(
@@ -5398,24 +5671,14 @@ document.addEventListener(
         const plus =
             $("plusButton");
 
-        if (
-            !menu ||
-            !plus
-        ) {
+        if (!menu || !plus) {
             return;
         }
 
-
         if (
-            menu.classList.contains(
-                "open"
-            ) &&
-            !menu.contains(
-                event.target
-            ) &&
-            !plus.contains(
-                event.target
-            )
+            menu.classList.contains("open") &&
+            !menu.contains(event.target) &&
+            !plus.contains(event.target)
         ) {
 
             closeUploadMenu();
@@ -5433,8 +5696,7 @@ document.addEventListener(
     event => {
 
         if (
-            event.key ===
-            "Escape"
+            event.key === "Escape"
         ) {
 
             closeUploadMenu();
@@ -5442,14 +5704,13 @@ document.addEventListener(
             closePanels();
 
             closeCamera();
-
         }
     }
 );
 
 
 /* =========================================================
-   CLEANUP CAMERA ON PAGE EXIT
+   CLEANUP
 ========================================================= */
 
 window.addEventListener(
@@ -5489,7 +5750,6 @@ function initializeReviewWise() {
         "🚀 Initializing ReviewWise..."
     );
 
-
     setupPhoto();
 
     setupVideo();
@@ -5507,19 +5767,21 @@ function initializeReviewWise() {
         input.addEventListener(
             "input",
             () => {
+
                 updateCharacterCount();
+
                 updateWordCount();
+
             }
         );
 
         updateCharacterCount();
+
         updateWordCount();
     }
 
 
-    /*
-     * Loading screen
-     */
+    /* LOADING SCREEN */
 
     const loading =
         $("loadingScreen");
@@ -5559,4 +5821,5 @@ if (
 } else {
 
     initializeReviewWise();
+
 }
