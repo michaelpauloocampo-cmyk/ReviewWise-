@@ -1,32 +1,47 @@
 "use strict";
 
+/* =========================================================
+   REVIEWWISE AI CREDIBILITY CHECKER
+   FULL BACKEND SERVER
+   Render / Localhost compatible
+========================================================= */
+
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegPath = require("ffmpeg-static");
+
 const vision = require("@google-cloud/vision");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 
+
+/* =========================================================
+   APP CONFIGURATION
+========================================================= */
+
 const app = express();
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT =
+    Number(process.env.PORT) || 3000;
+
+const BASE_DIR =
+    __dirname;
+
+const uploadsDir =
+    path.join(
+        BASE_DIR,
+        "uploads"
+    );
 
 
 /* =========================================================
-   DIRECTORIES
-   Works on Render, localhost, Windows, Linux and Termux.
+   CREATE UPLOAD DIRECTORY
 ========================================================= */
-
-const BASE_DIR = __dirname;
-
-const uploadsDir = path.join(
-    BASE_DIR,
-    "uploads"
-);
 
 fs.mkdirSync(
     uploadsDir,
@@ -35,11 +50,28 @@ fs.mkdirSync(
     }
 );
 
-console.log("=================================");
-console.log("ReviewWise server starting...");
-console.log("Base directory:", BASE_DIR);
-console.log("Uploads directory:", uploadsDir);
-console.log("=================================");
+
+console.log(
+    "================================="
+);
+
+console.log(
+    "ReviewWise server starting..."
+);
+
+console.log(
+    "Base directory:",
+    BASE_DIR
+);
+
+console.log(
+    "Uploads directory:",
+    uploadsDir
+);
+
+console.log(
+    "================================="
+);
 
 
 /* =========================================================
@@ -50,6 +82,14 @@ let visionClient = null;
 
 try {
 
+    /*
+       Option 1:
+       GOOGLE_CREDENTIALS_JSON
+
+       Put your complete Google service-account JSON
+       inside the Render environment variable.
+    */
+
     if (
         process.env.GOOGLE_CREDENTIALS_JSON
     ) {
@@ -58,6 +98,7 @@ try {
             JSON.parse(
                 process.env.GOOGLE_CREDENTIALS_JSON
             );
+
 
         visionClient =
             new vision.ImageAnnotatorClient({
@@ -68,53 +109,79 @@ try {
                         credentials.client_email,
 
                     private_key:
-                        credentials.private_key
-                            .replace(
-                                /\\n/g,
-                                "\n"
-                            )
+                        String(
+                            credentials.private_key ||
+                            ""
+                        ).replace(
+                            /\\n/g,
+                            "\n"
+                        )
                 },
 
                 projectId:
                     credentials.project_id
+
             });
 
-    } else {
+
+        console.log(
+            "Google Cloud Vision client initialized using GOOGLE_CREDENTIALS_JSON."
+        );
+
+    }
+
+    /*
+       Option 2:
+       GOOGLE_APPLICATION_CREDENTIALS
+
+       Google Cloud can automatically load the
+       credentials file from this environment variable.
+    */
+
+    else {
 
         visionClient =
             new vision.ImageAnnotatorClient();
+
+
+        console.log(
+            "Google Cloud Vision client initialized using default credentials."
+        );
     }
 
-    console.log(
-        "Google Cloud Vision client initialized."
-    );
-
-} catch (error) {
+} catch (
+    error
+) {
 
     console.error(
-        "Google Vision initialization failed:",
+        "Google Vision initialization failed:"
+    );
+
+    console.error(
         error.message
     );
 
-    console.error(
-        "OCR will fail until Google credentials are configured."
+    console.warn(
+        "OCR features will not work until Google Cloud Vision credentials are configured."
     );
 }
 
 
 /* =========================================================
-   EXPRESS
+   EXPRESS MIDDLEWARE
 ========================================================= */
 
 app.use(
     cors()
 );
 
+
 app.use(
     express.json({
         limit: "10mb"
     })
 );
+
 
 app.use(
     express.urlencoded({
@@ -136,21 +203,25 @@ if (
         ffmpegPath
     );
 
+
     console.log(
-        "FFmpeg found:",
+        "FFmpeg found:"
+    );
+
+    console.log(
         ffmpegPath
     );
 
 } else {
 
     console.warn(
-        "WARNING: ffmpeg-static could not provide FFmpeg."
+        "WARNING: ffmpeg-static did not provide an FFmpeg binary."
     );
 }
 
 
 /* =========================================================
-   MULTER
+   MULTER - IMAGE UPLOAD
 ========================================================= */
 
 const imageUpload =
@@ -165,6 +236,7 @@ const imageUpload =
                 10 *
                 1024 *
                 1024
+
         },
 
         fileFilter:
@@ -195,8 +267,13 @@ const imageUpload =
                     );
                 }
             }
+
     });
 
+
+/* =========================================================
+   MULTER - VIDEO UPLOAD
+========================================================= */
 
 const videoUpload =
     multer({
@@ -210,6 +287,7 @@ const videoUpload =
                 60 *
                 1024 *
                 1024
+
         },
 
         fileFilter:
@@ -240,8 +318,13 @@ const videoUpload =
                     );
                 }
             }
+
     });
 
+
+/* =========================================================
+   FILE UPLOAD
+========================================================= */
 
 const allowedFileExtensions =
     [
@@ -275,6 +358,7 @@ const fileUpload =
                 20 *
                 1024 *
                 1024
+
         },
 
         fileFilter:
@@ -318,6 +402,7 @@ const fileUpload =
                     );
                 }
             }
+
     });
 
 
@@ -352,11 +437,12 @@ const wordCategories = {
         "secret"
 
     ]
+
 };
 
 
 /* =========================================================
-   HELPERS
+   HELPER - ESCAPE REGEX
 ========================================================= */
 
 function escapeRegex(
@@ -371,6 +457,10 @@ function escapeRegex(
     );
 }
 
+
+/* =========================================================
+   HELPER - DELETE FILE
+========================================================= */
 
 function safeDelete(
     filePath
@@ -395,6 +485,7 @@ function safeDelete(
             fs.unlinkSync(
                 filePath
             );
+
         }
 
     } catch (
@@ -408,6 +499,10 @@ function safeDelete(
     }
 }
 
+
+/* =========================================================
+   CLEAN TEXT
+========================================================= */
 
 function cleanText(
     text
@@ -441,6 +536,10 @@ function cleanText(
 }
 
 
+/* =========================================================
+   NORMALIZE TEXT
+========================================================= */
+
 function normalizeText(
     text
 ) {
@@ -466,7 +565,7 @@ function normalizeText(
 
 
 /* =========================================================
-   PHRASE MATCHING
+   FIND PHRASE MATCHES
 ========================================================= */
 
 function findPhraseMatches(
@@ -574,6 +673,7 @@ function analyzeText(
 
     /* =====================================================
        CLICKBAIT
+       -5 EACH
     ====================================================== */
 
     clickbaitMatches.forEach(
@@ -598,6 +698,7 @@ function analyzeText(
 
     /* =====================================================
        MISLEADING
+       -5 EACH
     ====================================================== */
 
     misleadingMatches.forEach(
@@ -762,7 +863,7 @@ function analyzeText(
 
 
     /* =====================================================
-       CLAMP
+       CLAMP SCORE
     ====================================================== */
 
     credibility =
@@ -864,7 +965,7 @@ function analyzeText(
 
 
 /* =========================================================
-   HIGHLIGHTED WORDS
+   GET HIGHLIGHTED WORDS
 ========================================================= */
 
 function getHighlightedWordsFromText(
@@ -966,7 +1067,7 @@ function getHighlightedWordsFromText(
 
 
 /* =========================================================
-   GOOGLE VISION CATEGORY
+   CATEGORIZE OCR WORD
 ========================================================= */
 
 function categorizeWord(
@@ -1071,6 +1172,7 @@ function computeServerOcrQuality(
 
             label:
                 "Poor"
+
         };
     }
 
@@ -1173,7 +1275,7 @@ function computeServerOcrQuality(
 
         wordValidityRatio *
         100 *
-        0.2 +
+        0.20 +
 
         Math.max(
             0,
@@ -1182,7 +1284,7 @@ function computeServerOcrQuality(
             4
         ) *
         100 *
-        0.1;
+        0.10;
 
 
     if (
@@ -1260,7 +1362,7 @@ async function runVisionOnFile(
     ) {
 
         throw new Error(
-            "Google Cloud Vision is not configured. Add GOOGLE_CREDENTIALS_JSON or GOOGLE_APPLICATION_CREDENTIALS."
+            "Google Cloud Vision is not configured. Add GOOGLE_CREDENTIALS_JSON to Render Environment Variables."
         );
     }
 
@@ -1303,8 +1405,7 @@ async function runVisionOnFile(
         "";
 
 
-    const highlightedWords =
-        [];
+    const highlightedWords = [];
 
 
     let totalConfidence =
@@ -1366,6 +1467,7 @@ async function runVisionOnFile(
                                             wordText +=
                                                 symbol.text ||
                                                 "";
+
                                         }
                                     );
 
@@ -1481,7 +1583,9 @@ async function runVisionOnFile(
                                                 Math.max(
                                                     ...ys
                                                 )
+
                                         }
+
                                     });
                                 }
                             );
@@ -1519,6 +1623,10 @@ async function runVisionOnFile(
     };
 }
 
+
+/* =========================================================
+   PERFORM GOOGLE OCR
+========================================================= */
 
 async function performGoogleOCR(
     imagePath
@@ -1624,11 +1732,13 @@ async function performGoogleOCR(
 
 
 /* =========================================================
-   TEXT API
+   POST /analyze
+   TEXT ANALYSIS
 ========================================================= */
 
 app.post(
     "/analyze",
+
     (
         req,
         res
@@ -1664,7 +1774,7 @@ app.post(
                 );
 
 
-            res.json({
+            return res.json({
 
                 ...analysis,
 
@@ -1690,7 +1800,7 @@ app.post(
             );
 
 
-            res.status(
+            return res.status(
                 500
             ).json({
 
@@ -1704,7 +1814,7 @@ app.post(
 
 
 /* =========================================================
-   IMAGE API
+   POST /analyze-image
 ========================================================= */
 
 app.post(
@@ -1760,6 +1870,11 @@ app.post(
                 false;
 
 
+            /*
+               Prevent unreliable OCR from
+               creating an extreme credibility score.
+            */
+
             if (
                 Number.isFinite(
                     ocr.ocrQuality
@@ -1787,6 +1902,7 @@ app.post(
                             1 -
                             weight
                         )
+
                     );
 
 
@@ -1832,7 +1948,7 @@ app.post(
             );
 
 
-            res.json({
+            return res.json({
 
                 ...analysis,
 
@@ -1877,7 +1993,7 @@ app.post(
             );
 
 
-            res.status(
+            return res.status(
                 500
             ).json({
 
@@ -1917,13 +2033,44 @@ function extractVideoFrames(
             )
 
                 .on(
+                    "start",
+                    command => {
+
+                        console.log(
+                            "FFmpeg command started:"
+                        );
+
+                        console.log(
+                            command
+                        );
+                    }
+                )
+
+                .on(
                     "end",
-                    resolve
+                    () => {
+
+                        console.log(
+                            "Video frames extracted."
+                        );
+
+                        resolve();
+                    }
                 )
 
                 .on(
                     "error",
-                    reject
+                    error => {
+
+                        console.error(
+                            "FFmpeg error:",
+                            error.message
+                        );
+
+                        reject(
+                            error
+                        );
+                    }
                 )
 
                 .screenshots({
@@ -1944,7 +2091,7 @@ function extractVideoFrames(
 
 
 /* =========================================================
-   NORMALIZE VIDEO TEXT
+   NORMALIZE VIDEO LINE
 ========================================================= */
 
 function normalizeVideoLine(
@@ -1965,7 +2112,7 @@ function normalizeVideoLine(
 
 
 /* =========================================================
-   VIDEO API
+   POST /analyze-video
 ========================================================= */
 
 app.post(
@@ -2249,7 +2396,7 @@ app.post(
                     : 0;
 
 
-            res.json({
+            return res.json({
 
                 ...analysis,
 
@@ -2282,7 +2429,7 @@ app.post(
             );
 
 
-            res.status(
+            return res.status(
                 500
             ).json({
 
@@ -2316,7 +2463,7 @@ app.post(
 
 
 /* =========================================================
-   FILE API
+   POST /analyze-file
 ========================================================= */
 
 app.post(
@@ -2461,7 +2608,7 @@ app.post(
                 );
 
 
-            res.json({
+            return res.json({
 
                 ...analysis,
 
@@ -2488,7 +2635,7 @@ app.post(
             );
 
 
-            res.status(
+            return res.status(
                 500
             ).json({
 
@@ -2514,12 +2661,13 @@ app.post(
 
 app.get(
     "/health",
+
     (
         req,
         res
     ) => {
 
-        res.json({
+        return res.json({
 
             status:
                 "ok",
@@ -2591,7 +2739,10 @@ app.use(
     ) => {
 
         console.error(
-            "SERVER ERROR:",
+            "SERVER ERROR:"
+        );
+
+        console.error(
             err
         );
 
@@ -2620,7 +2771,7 @@ app.use(
         }
 
 
-        res.status(
+        return res.status(
             status
         ).json({
 
