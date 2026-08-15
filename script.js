@@ -1974,6 +1974,27 @@ function toggleSpeechToText() {
         return;
     }
 
+    /* Never allow two recognition instances to run
+       at once — if a stale instance is somehow still
+       around, forcibly tear it down first. */
+    if (speechRecognition) {
+
+        try {
+
+            speechRecognition.onend = null;
+            speechRecognition.onresult = null;
+            speechRecognition.onerror = null;
+
+            speechRecognition.stop();
+
+        } catch {
+
+            /* ignore — instance may already be dead */
+        }
+
+        speechRecognition = null;
+    }
+
     const input = $("newsInput");
     const micButton = $("micButton");
     const micLabel = $("micLabel");
@@ -1985,24 +2006,66 @@ function toggleSpeechToText() {
     speechRecognition.lang = "en-US";
     speechRecognition.continuous = true;
     speechRecognition.interimResults = true;
+    speechRecognition.maxAlternatives = 1;
 
-    let finalTranscript =
+    /* ---------------------------------------------------
+       TEXT STATE
+
+       originalText  — whatever was already in the textarea
+                       before the mic was pressed. Never
+                       touched again for this session.
+       finalSpeech   — confirmed/final speech, committed
+                       exactly once per unique final result.
+       interimSpeech — temporary in-progress speech. Fully
+                       recomputed on every onresult event,
+                       so it can never itself duplicate.
+    --------------------------------------------------- */
+
+    const originalText =
         input ? input.value : "";
 
-    if (
-        finalTranscript &&
-        !finalTranscript.endsWith(" ")
-    ) {
+    const originalTextWithSpacer =
+        originalText &&
+        !/\s$/.test(originalText)
 
-        finalTranscript += " ";
+            ? originalText + " "
+            : originalText;
+
+    let finalSpeech = "";
+    let interimSpeech = "";
+
+    /* Guards against Chrome/Android redelivering a final
+       result: once, by result index (normal case), and
+       again by normalized text (covers the case where the
+       same phrase reappears under a different/reset index,
+       which is the real cause of "hello world hello world"
+       style duplication on mobile Chrome). */
+    const committedIndices = new Set();
+    let lastCommittedNormalized = "";
+
+    function normalizeChunk(text) {
+
+        return text
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, " ");
     }
 
-    /* Tracks the highest result index already
-       committed to finalTranscript, so a final
-       result that gets redelivered in a later
-       onresult event (common on Chrome/Android)
-       isn't appended more than once. */
-    let lastCommittedFinalIndex = -1;
+    function renderTranscript() {
+
+        if (!input) {
+            return;
+        }
+
+        input.value = (
+            originalTextWithSpacer +
+            finalSpeech +
+            interimSpeech
+        ).replace(/[ \t]+/g, " ");
+
+        updateCharacterCount();
+        updateWordCount();
+    }
 
     speechRecognition.onstart = () => {
 
@@ -2026,50 +2089,70 @@ function toggleSpeechToText() {
     speechRecognition.onresult =
         event => {
 
-            let interim = "";
+            /* Interim text is rebuilt from scratch every
+               event — it is never appended to, so it can
+               never itself cause a permanent duplicate. */
+            interimSpeech = "";
 
             for (
-                let i = event.resultIndex;
+                let i = 0;
                 i < event.results.length;
                 i++
             ) {
 
-                const transcriptChunk =
-                    event.results[i][0]
-                        .transcript;
+                const result =
+                    event.results[i];
 
-                if (
-                    event.results[i].isFinal
-                ) {
+                const transcriptChunk =
+                    result[0].transcript;
+
+                if (result.isFinal) {
 
                     if (
-                        i > lastCommittedFinalIndex
+                        committedIndices.has(i)
                     ) {
 
-                        finalTranscript +=
-                            transcriptChunk + " ";
-
-                        lastCommittedFinalIndex = i;
+                        /* Already committed this exact
+                           result index — skip. */
+                        continue;
                     }
+
+                    const normalized =
+                        normalizeChunk(
+                            transcriptChunk
+                        );
+
+                    committedIndices.add(i);
+
+                    if (!normalized) {
+                        continue;
+                    }
+
+                    if (
+                        normalized ===
+                        lastCommittedNormalized
+                    ) {
+
+                        /* Same phrase redelivered under a
+                           new/reset index — skip it so the
+                           sentence isn't added twice. */
+                        continue;
+                    }
+
+                    finalSpeech +=
+                        transcriptChunk.trim() + " ";
+
+                    lastCommittedNormalized =
+                        normalized;
 
                 } else {
 
-                    interim +=
+                    interimSpeech +=
                         transcriptChunk;
                 }
             }
 
-            if (input) {
-
-                input.value =
-                    (
-                        finalTranscript +
-                        interim
-                    ).trim();
-
-                updateCharacterCount();
-                updateWordCount();
-            }
+            renderTranscript();
         };
 
     speechRecognition.onerror =
@@ -2095,6 +2178,15 @@ function toggleSpeechToText() {
 
         isListening = false;
 
+        /* Drop any leftover interim text so a result that
+           never finalized before the session ended (e.g.
+           the browser auto-stopping after silence) can't
+           linger, and can't be duplicated if the mic is
+           pressed again. */
+        interimSpeech = "";
+
+        renderTranscript();
+
         micButton?.classList.remove(
             "listening"
         );
@@ -2108,6 +2200,8 @@ function toggleSpeechToText() {
             micIcon.textContent =
                 "🎤";
         }
+
+        speechRecognition = null;
     };
 
     try {
@@ -2125,6 +2219,8 @@ function toggleSpeechToText() {
             "Unable to start speech-to-text.",
             "error"
         );
+
+        speechRecognition = null;
     }
 }
 
