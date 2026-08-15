@@ -673,14 +673,14 @@ function analyzeText(
 
     /* =====================================================
        CLICKBAIT
-       -5 EACH
+       -1 EACH
     ====================================================== */
 
     clickbaitMatches.forEach(
         word => {
 
             credibility -=
-                5;
+                1;
 
 
             explanation.push({
@@ -698,14 +698,14 @@ function analyzeText(
 
     /* =====================================================
        MISLEADING
-       -5 EACH
+       -1 EACH
     ====================================================== */
 
     misleadingMatches.forEach(
         word => {
 
             credibility -=
-                5;
+                1;
 
 
             explanation.push({
@@ -759,47 +759,6 @@ function analyzeText(
 
             text:
                 `The content contains ${exclamationCount} exclamation marks, which can make the message appear unusually urgent or emotional.`
-
-        });
-    }
-
-
-    /* =====================================================
-       ALL CAPS
-    ====================================================== */
-
-    const capsWords =
-        text.match(
-            /\b[A-Z]{3,}\b/g
-        ) || [];
-
-
-    if (
-        capsWords.length >=
-        3
-    ) {
-
-        const penalty =
-            Math.min(
-                8,
-                Math.floor(
-                    capsWords.length /
-                    2
-                )
-            );
-
-
-        credibility -=
-            penalty;
-
-
-        explanation.push({
-
-            type:
-                "capitalization",
-
-            text:
-                `The content uses ${capsWords.length} ALL CAPS words, which can emphasize or intensify the message.`
 
         });
     }
@@ -949,9 +908,6 @@ function analyzeText(
 
         punctuation:
             exclamationCount,
-
-        capitalization:
-            capsWords.length,
 
         emotional:
             emotionalMatches.length,

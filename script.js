@@ -72,11 +72,6 @@ const patternDefinitions = {
         icon: "⚠️"
     },
 
-    capitalization: {
-        label: "Excessive Capitalization",
-        icon: "🔠"
-    },
-
     punctuation: {
         label: "Excessive Punctuation",
         icon: "❗"
@@ -812,24 +807,6 @@ function buildDynamicExplanations(analysis) {
     }
 
 
-    const capsMatches =
-        text.match(
-            /\b[A-Z]{3,}\b/g
-        ) || [];
-
-    if (capsMatches.length >= 3) {
-
-        explanations.push({
-
-            icon: "🔠",
-
-            text:
-                `The content uses ${capsMatches.length} ALL CAPS words, which can make language appear more urgent or emphatic.`
-
-        });
-    }
-
-
     if (explanations.length === 0) {
 
         explanations.push({
@@ -887,13 +864,6 @@ function getBreakdown(analysis) {
                 )
         ).length;
 
-    const capitalization =
-        (
-            text.match(
-                /\b[A-Z]{3,}\b/g
-            ) || []
-        ).length;
-
     const punctuation =
         (
             text.match(/!/g) || []
@@ -918,15 +888,12 @@ function getBreakdown(analysis) {
 
         misleading,
 
-        capitalization,
-
         punctuation,
 
         emotional:
             Math.min(
                 100,
-                punctuation * 15 +
-                capitalization * 10
+                punctuation * 15
             )
     };
 }
@@ -1159,11 +1126,6 @@ function renderAnalysis(analysis) {
             {
                 key: "suspicious",
                 value: breakdown.suspicious
-            },
-
-            {
-                key: "capitalization",
-                value: breakdown.capitalization
             },
 
             {
