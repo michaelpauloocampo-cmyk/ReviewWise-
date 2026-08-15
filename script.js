@@ -8,6 +8,7 @@ const API_BASE = "https://reviewwise.onrender.com";
 
 const REQUEST_TIMEOUT_MS = 45000;
 const MAX_HISTORY_ITEMS = 50;
+const HOW_TO_USE_SEEN_KEY = "reviewwiseSeenHowToUse";
 
 let uploadedFile = null;
 let uploadedFileKind = null;
@@ -1996,6 +1997,13 @@ function toggleSpeechToText() {
         finalTranscript += " ";
     }
 
+    /* Tracks the highest result index already
+       committed to finalTranscript, so a final
+       result that gets redelivered in a later
+       onresult event (common on Chrome/Android)
+       isn't appended more than once. */
+    let lastCommittedFinalIndex = -1;
+
     speechRecognition.onstart = () => {
 
         isListening = true;
@@ -2034,8 +2042,15 @@ function toggleSpeechToText() {
                     event.results[i].isFinal
                 ) {
 
-                    finalTranscript +=
-                        transcriptChunk + " ";
+                    if (
+                        i > lastCommittedFinalIndex
+                    ) {
+
+                        finalTranscript +=
+                            transcriptChunk + " ";
+
+                        lastCommittedFinalIndex = i;
+                    }
 
                 } else {
 
@@ -5592,6 +5607,79 @@ function openAbout() {
 
 
 /* =========================================================
+   HOW TO USE (ONBOARDING)
+========================================================= */
+
+function openHowToUse() {
+
+    closeSidebar();
+
+    const screen =
+        $("howToUseScreen");
+
+    if (!screen) {
+        return;
+    }
+
+    screen.classList.remove(
+        "hidden"
+    );
+
+    requestAnimationFrame(
+        () => {
+
+            screen.classList.remove(
+                "hide"
+            );
+
+        }
+    );
+}
+
+
+function continueToApp() {
+
+    const screen =
+        $("howToUseScreen");
+
+    if (screen) {
+
+        screen.classList.add(
+            "hide"
+        );
+
+        setTimeout(
+            () => {
+
+                screen.classList.add(
+                    "hidden"
+                );
+
+            },
+            300
+        );
+    }
+
+    try {
+
+        localStorage.setItem(
+            HOW_TO_USE_SEEN_KEY,
+            "1"
+        );
+
+    } catch {
+
+        /* localStorage unavailable — ignore */
+    }
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+}
+
+
+/* =========================================================
    CLOSE PANELS
 ========================================================= */
 
@@ -5792,6 +5880,29 @@ function initializeReviewWise() {
             loading?.classList.add(
                 "hide"
             );
+
+            /* Show the "How to Use" guide before the
+               main page on a person's first visit. */
+
+            let hasSeenHowToUse = false;
+
+            try {
+
+                hasSeenHowToUse =
+                    localStorage.getItem(
+                        HOW_TO_USE_SEEN_KEY
+                    ) === "1";
+
+            } catch {
+
+                hasSeenHowToUse = false;
+            }
+
+            if (!hasSeenHowToUse) {
+
+                openHowToUse();
+
+            }
 
         },
         1200
