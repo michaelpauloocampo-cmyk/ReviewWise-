@@ -2160,7 +2160,7 @@ function toggleSpeechToText() {
 
         if (micIcon) {
             micIcon.textContent =
-                "🎤";
+                "";
         }
 
         speechRecognition = null;
