@@ -735,7 +735,7 @@ function analyzeText(
 
     if (
         exclamationCount >=
-        7
+        3
     ) {
 
         const penalty =

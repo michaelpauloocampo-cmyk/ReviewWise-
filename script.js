@@ -85,6 +85,24 @@ const patternDefinitions = {
 
 
 /* =========================================================
+   FOOTER YEAR
+========================================================= */
+
+function updateFooterYear() {
+
+    const yearEl =
+        $("footerYear");
+
+    if (!yearEl) {
+        return;
+    }
+
+    yearEl.textContent =
+        new Date().getFullYear();
+}
+
+
+/* =========================================================
    DOM HELPER
 ========================================================= */
 
@@ -2160,7 +2178,7 @@ function toggleSpeechToText() {
 
         if (micIcon) {
             micIcon.textContent =
-                "";
+                "🎤";
         }
 
         speechRecognition = null;
@@ -5903,6 +5921,8 @@ function initializeReviewWise() {
     setupFile();
 
     setupDragAndDrop();
+
+    updateFooterYear();
 
 
     const input =
