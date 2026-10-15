@@ -176,6 +176,21 @@ try {
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
     .split(",").map(value => value.trim()).filter(Boolean);
 
+const allowVercelPreviewOrigins =
+    String(process.env.ALLOW_VERCEL_ORIGINS || "true").toLowerCase() === "true";
+
+function isAllowedOrigin(origin) {
+    if (!origin) return true;
+    if (allowedOrigins.includes(origin)) return true;
+    if (!allowVercelPreviewOrigins) return false;
+    try {
+        const hostname = new URL(origin).hostname;
+        return hostname === "vercel.app" || hostname.endsWith(".vercel.app");
+    } catch {
+        return false;
+    }
+}
+
 app.use((req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
@@ -187,8 +202,7 @@ app.use((req, res, next) => {
 app.use(cors({
     origin(origin, callback) {
         // Allow non-browser/server-to-server calls and same-origin requests.
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
+        if (isAllowedOrigin(origin)) return callback(null, true);
         // No CORS response headers for unlisted browser origins.
         return callback(null, false);
     }

@@ -4,7 +4,7 @@
    REVIEWWISE CONFIGURATION
 ========================================================= */
 
-const API_BASE = window.REVIEWWISE_API_BASE || ((location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://reviewwise.onrender.com");
+const API_BASE = (window.REVIEWWISE_CONFIG && window.REVIEWWISE_CONFIG.apiBase) || ((location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://reviewwise.onrender.com");
 
 const REQUEST_TIMEOUT_MS = 45000;
 const MAX_HISTORY_ITEMS = 50;
@@ -6077,7 +6077,14 @@ if (
             });
             document.body.appendChild(button);
         }
-        
+        try {
+            if (localStorage.getItem("reviewwiseTheme") === "dark") {
+                document.documentElement.classList.add("rw-dark");
+                document.documentElement.dataset.rwTheme = "dark";
+                const toggle = document.getElementById("rwThemeToggle");
+                if (toggle) toggle.textContent = "☀ Light mode";
+            }
+        } catch (_) {}
     }
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mountEnhancements, { once: true });
     else mountEnhancements();

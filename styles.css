@@ -4255,7 +4255,18 @@ img, video, canvas {
     font-size: .92rem;
     line-height: 1.55;
 }
-
+.rw-theme-toggle {
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    z-index: 999;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 10px 14px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    cursor: pointer;
 }
 html.rw-dark {
     color-scheme: dark;
