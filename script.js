@@ -4,7 +4,7 @@
    REVIEWWISE CONFIGURATION
 ========================================================= */
 
-const API_BASE = "https://reviewwise.onrender.com";
+const API_BASE = window.REVIEWWISE_API_BASE || ((location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://reviewwise.onrender.com");
 
 const REQUEST_TIMEOUT_MS = 45000;
 const MAX_HISTORY_ITEMS = 50;
@@ -5311,6 +5311,11 @@ function closeSidebar() {
 
 function goHome() {
 
+    if (!$("newsInput")) {
+        window.location.href = "index.html";
+        return;
+    }
+
     closeSidebar();
 
     closePanels();
@@ -5384,6 +5389,11 @@ function getHistory() {
 
 
 function openHistory() {
+
+    if (!("historyPanel" in document) || !$("historyPanel")) {
+        window.location.href = "history.html";
+        return;
+    }
 
     closeSidebar();
 
@@ -5583,6 +5593,14 @@ function openHistoryItem(id) {
         return;
     }
 
+    if (!$("newsInput")) {
+        try {
+            sessionStorage.setItem("reviewwiseOpenHistoryItem", id);
+        } catch {}
+        window.location.href = "index.html";
+        return;
+    }
+
     closePanels();
 
     const input =
@@ -5657,6 +5675,11 @@ function deleteHistoryItem(id) {
 
 function openAbout() {
 
+    if (!$("aboutPanel")) {
+        window.location.href = "about.html";
+        return;
+    }
+
     closeSidebar();
 
     const panel =
@@ -5688,6 +5711,11 @@ function openAbout() {
 
 function openHowToUse() {
 
+    if (!$("howToUseScreen")) {
+        window.location.href = "how-to-use.html";
+        return;
+    }
+
     closeSidebar();
 
     const screen =
@@ -5714,6 +5742,11 @@ function openHowToUse() {
 
 
 function continueToApp() {
+
+    if (!$("howToUseScreen")) {
+        window.location.href = "index.html";
+        return;
+    }
 
     const screen =
         $("howToUseScreen");
@@ -5924,6 +5957,9 @@ function initializeReviewWise() {
 
     updateFooterYear();
 
+    if ($("historyPanel") && $("historyList")) {
+        renderHistory();
+    }
 
     const input =
         $("newsInput");
@@ -5946,6 +5982,27 @@ function initializeReviewWise() {
         updateWordCount();
     }
 
+    try {
+        const savedHistoryId = sessionStorage.getItem("reviewwiseOpenHistoryItem");
+        if (savedHistoryId) {
+            sessionStorage.removeItem("reviewwiseOpenHistoryItem");
+            const savedItem = getHistory().find(item => item.id === savedHistoryId);
+            if (savedItem) {
+                input.value = savedItem.text || "";
+                updateCharacterCount();
+                updateWordCount();
+                renderAnalysis(savedItem.analysis || {
+                    text: savedItem.text,
+                    credibility: savedItem.credibility,
+                    status: savedItem.status,
+                    highlightedWords: []
+                });
+            }
+        }
+    } catch (error) {
+        console.warn("Could not restore the selected history result:", error);
+    }
+
 
     /* LOADING SCREEN */
 
@@ -5959,28 +6016,6 @@ function initializeReviewWise() {
                 "hide"
             );
 
-            /* Show the "How to Use" guide before the
-               main page on a person's first visit. */
-
-            let hasSeenHowToUse = false;
-
-            try {
-
-                hasSeenHowToUse =
-                    localStorage.getItem(
-                        HOW_TO_USE_SEEN_KEY
-                    ) === "1";
-
-            } catch {
-
-                hasSeenHowToUse = false;
-            }
-
-            if (!hasSeenHowToUse) {
-
-                openHowToUse();
-
-            }
 
         },
         1200
@@ -6012,3 +6047,38 @@ if (
     initializeReviewWise();
 
 }
+
+/* =========================================================
+   REVIEWWISE UPGRADE: TRANSPARENT ANALYSIS NOTICE + THEME
+========================================================= */
+(function addReviewWiseEnhancements() {
+    function mountEnhancements() {
+        if (!document.getElementById("rwTrustNotice")) {
+            const notice = document.createElement("aside");
+            notice.id = "rwTrustNotice";
+            notice.className = "rw-trust-notice";
+            notice.setAttribute("role", "note");
+            notice.innerHTML = '<strong>Important:</strong> ReviewWise checks wording patterns such as clickbait, urgency, and exaggerated language. A low-risk result does <u>not</u> prove that a claim is true. Verify important claims using reliable, independent sources.';
+            const hero = document.querySelector(".hero");
+            if (hero) hero.insertAdjacentElement("afterend", notice);
+        }
+        if (!document.getElementById("rwThemeToggle")) {
+            const button = document.createElement("button");
+            button.id = "rwThemeToggle";
+            button.type = "button";
+            button.className = "rw-theme-toggle";
+            button.textContent = document.documentElement.dataset.rwTheme === "dark" ? "☀ Light mode" : "◐ Dark mode";
+            button.setAttribute("aria-label", "Toggle dark mode");
+            button.addEventListener("click", () => {
+                const dark = document.documentElement.classList.toggle("rw-dark");
+                document.documentElement.dataset.rwTheme = dark ? "dark" : "light";
+                try { localStorage.setItem("reviewwiseTheme", dark ? "dark" : "light"); } catch (_) {}
+                button.textContent = dark ? "☀ Light mode" : "◐ Dark mode";
+            });
+            document.body.appendChild(button);
+        }
+        
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mountEnhancements, { once: true });
+    else mountEnhancements();
+})();

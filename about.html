@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <title>ReviewWise | About</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<button
+    class="hamburger"
+    onclick="toggleSidebar()"
+    aria-label="Open navigation">
+
+    <span></span>
+    <span></span>
+    <span></span>
+
+</button>
+
+<div
+    id="sidebarOverlay"
+    class="hidden"
+    onclick="toggleSidebar()">
+</div>
+
+<!-- =====================================================
+     SIDEBAR
+====================================================== -->
+
+<aside id="sidebar">
+
+    <div class="sidebar-header">
+
+        <img
+            src="logo.png"
+            alt="ReviewWise Logo"
+            class="reviewwise-logo">
+
+        <div>
+
+            <h2>ReviewWise</h2>
+
+            <small>Credibility Checker</small>
+
+        </div>
+
+    </div>
+
+    <button onclick="goHome()">
+        <span>Home</span>
+    </button>
+
+    <button onclick="openHistory()">
+        <span>History</span>
+    </button>
+
+    <button onclick="openAbout()">
+        <span>About</span>
+    </button>
+
+    <button onclick="openHowToUse()">
+        <span>How to Use</span>
+    </button>
+
+    <button onclick="clearHistory()">
+        <span>Clear History</span>
+    </button>
+
+</aside>
+
+
+<main class="container page-container">
+<section id="aboutPanel" class="standalone-panel">
+
+    <div class="panel-header">
+
+        <div>
+
+            <span class="panel-eyebrow">
+                About
+            </span>
+
+            <h2>About ReviewWise</h2>
+
+        </div>
+
+        <button
+            class="close-btn"
+            onclick="goHome()"
+            aria-label="Close">
+
+            ×
+
+        </button>
+
+    </div>
+
+    <div class="about-content">
+
+        <div class="about-logo">
+
+            <img
+                src="logo.png"
+                alt="ReviewWise">
+
+        </div>
+
+        <p>
+
+            <strong>ReviewWise</strong> is an AI-assisted
+            credibility checking tool designed to identify
+            language patterns that may indicate clickbait,
+            exaggerated claims, excessive punctuation,
+            emotional language, or other suspicious signals.
+
+        </p>
+
+        <div class="info-card">
+
+            <strong>Important</strong>
+
+            <p>
+
+                The credibility score is a
+                <strong>risk indicator</strong>.
+                It does not prove that information is true
+                or false. Important claims should still be
+                verified using reliable sources.
+
+            </p>
+
+        </div>
+
+        <div class="feature-list">
+
+            <div>
+                <span></span>
+                <span>Text Analysis</span>
+            </div>
+
+            <div>
+                <span></span>
+                <span>Camera & OCR</span>
+            </div>
+
+            <div>
+                <span></span>
+                <span>Image Analysis</span>
+            </div>
+
+            <div>
+                <span></span>
+                <span>Video OCR</span>
+            </div>
+
+            <div>
+                <span></span>
+                <span>PDF, DOCX & TXT</span>
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+</main>
+
+<div id="toast" class="toast hidden">
+  <span id="toastIcon">✓</span>
+  <span id="toastMessage">Done</span>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

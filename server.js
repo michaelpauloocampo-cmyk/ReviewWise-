@@ -171,9 +171,64 @@ try {
    EXPRESS MIDDLEWARE
 ========================================================= */
 
-app.use(
-    cors()
-);
+// Security headers and configurable CORS. Set ALLOWED_ORIGINS as a
+// comma-separated list in production; unset means same-origin requests only.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+    .split(",").map(value => value.trim()).filter(Boolean);
+
+app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Permissions-Policy", "camera=(self), microphone=(self)");
+    next();
+});
+
+app.use(cors({
+    origin(origin, callback) {
+        // Allow non-browser/server-to-server calls and same-origin requests.
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        // No CORS response headers for unlisted browser origins.
+        return callback(null, false);
+    }
+}));
+
+// Lightweight in-memory API rate limit. For multi-instance production hosting,
+// replace this with a shared store (for example Redis).
+const requestBuckets = new Map();
+const RATE_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT = Number(process.env.API_RATE_LIMIT) || 40;
+app.use("/analyze", (req, res, next) => {
+    const key = req.ip || req.socket.remoteAddress || "unknown";
+    const now = Date.now();
+    let bucket = requestBuckets.get(key);
+    if (!bucket || now - bucket.start >= RATE_WINDOW_MS) {
+        bucket = { start: now, count: 0 };
+    }
+    bucket.count += 1;
+    requestBuckets.set(key, bucket);
+    if (bucket.count > RATE_LIMIT) {
+        return res.status(429).json({ error: "Too many analysis requests. Please wait a minute and try again." });
+    }
+    next();
+});
+
+app.get("/health", (req, res) => {
+    res.json({ status: "ok", service: "ReviewWise", timestamp: new Date().toISOString() });
+});
+
+app.get("/capabilities", (req, res) => {
+    res.json({
+        textPatternAnalysis: true,
+        imageOcr: Boolean(visionClient),
+        videoFrameOcr: Boolean(visionClient && ffmpegPath),
+        pdfAndDocxExtraction: true,
+        liveFactChecking: false,
+        accounts: false,
+        note: "The language-risk analysis identifies wording patterns; it does not establish whether a claim is true or false."
+    });
+});
 
 
 app.use(
@@ -842,7 +897,7 @@ function analyzeText(
     ====================================================== */
 
     let status =
-        "HIGH CREDIBILITY";
+        "LOW LANGUAGE RISK";
 
 
     if (
@@ -853,7 +908,7 @@ function analyzeText(
     ) {
 
         status =
-            "MODERATE CREDIBILITY";
+            "MODERATE LANGUAGE RISK";
 
     } else if (
         credibility <
@@ -861,7 +916,7 @@ function analyzeText(
     ) {
 
         status =
-            "LOW CREDIBILITY";
+            "HIGH LANGUAGE RISK";
     }
 
 

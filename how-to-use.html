@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <title>ReviewWise | How to Use</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<button
+    class="hamburger"
+    onclick="toggleSidebar()"
+    aria-label="Open navigation">
+
+    <span></span>
+    <span></span>
+    <span></span>
+
+</button>
+
+<div
+    id="sidebarOverlay"
+    class="hidden"
+    onclick="toggleSidebar()">
+</div>
+
+<!-- =====================================================
+     SIDEBAR
+====================================================== -->
+
+<aside id="sidebar">
+
+    <div class="sidebar-header">
+
+        <img
+            src="logo.png"
+            alt="ReviewWise Logo"
+            class="reviewwise-logo">
+
+        <div>
+
+            <h2>ReviewWise</h2>
+
+            <small>Credibility Checker</small>
+
+        </div>
+
+    </div>
+
+    <button onclick="goHome()">
+        <span>Home</span>
+    </button>
+
+    <button onclick="openHistory()">
+        <span>History</span>
+    </button>
+
+    <button onclick="openAbout()">
+        <span>About</span>
+    </button>
+
+    <button onclick="openHowToUse()">
+        <span>How to Use</span>
+    </button>
+
+    <button onclick="clearHistory()">
+        <span>Clear History</span>
+    </button>
+
+</aside>
+
+
+<main class="container page-container">
+<div class="htu-card">
+
+        <div class="htu-logo">
+            <img src="logo.png" alt="ReviewWise Logo">
+        </div>
+
+        <span class="brand-badge">
+            WELCOME TO REVIEWWISE
+        </span>
+
+        <h2>How to Use</h2>
+
+        <p class="htu-subtitle">
+            A quick guide before you start checking content.
+        </p>
+
+        <div class="htu-steps">
+
+            <div class="htu-step">
+
+                <span class="htu-step-number">1</span>
+
+                <div>
+
+                    <strong>Add your content</strong>
+
+                    <p>
+                        Type or paste text, tap the Speak button to speak it,
+                        or use the + button to scan a photo, video, or upload
+                        a PDF, DOCX, or TXT file.
+                    </p>
+
+                </div>
+
+            </div>
+
+            <div class="htu-step">
+
+                <span class="htu-step-number">2</span>
+
+                <div>
+
+                    <strong>Review extracted text</strong>
+
+                    <p>
+                        If you scanned an image, video, or file, check the
+                        extracted text and edit it before analyzing.
+                    </p>
+
+                </div>
+
+            </div>
+
+            <div class="htu-step">
+
+                <span class="htu-step-number">3</span>
+
+                <div>
+
+                    <strong>Analyze Content</strong>
+
+                    <p>
+                        Tap "Analyze Content" to get a credibility score
+                        along with the patterns behind it.
+                    </p>
+
+                </div>
+
+            </div>
+
+            <div class="htu-step">
+
+                <span class="htu-step-number">4</span>
+
+                <div>
+
+                    <strong>Read the results</strong>
+
+                    <p>
+                        Check the score, the detected patterns, and the
+                        highlighted text to see exactly why something was flagged.
+                    </p>
+
+                </div>
+
+            </div>
+
+            <div class="htu-step">
+
+                <span class="htu-step-number">5</span>
+
+                <div>
+
+                    <strong>Revisit anytime</strong>
+
+                    <p>
+                        Open the sidebar menu to view your Check History
+                        or come back to this guide.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="info-card htu-note">
+
+            <strong>Remember</strong>
+
+            <p>
+                The credibility score is a risk indicator, not proof.
+                Always verify important claims with reliable sources.
+            </p>
+
+        </div>
+
+        <button
+            type="button"
+            class="generate-button htu-continue-button"
+            onclick="goHome()">
+
+            <span>Continue</span>
+            <span>→</span>
+
+        </button>
+</div>
+</main>
+
+<div id="toast" class="toast hidden">
+  <span id="toastIcon">✓</span>
+  <span id="toastMessage">Done</span>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <title>ReviewWise | Check History</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<button
+    class="hamburger"
+    onclick="toggleSidebar()"
+    aria-label="Open navigation">
+
+    <span></span>
+    <span></span>
+    <span></span>
+
+</button>
+
+<div
+    id="sidebarOverlay"
+    class="hidden"
+    onclick="toggleSidebar()">
+</div>
+
+<!-- =====================================================
+     SIDEBAR
+====================================================== -->
+
+<aside id="sidebar">
+
+    <div class="sidebar-header">
+
+        <img
+            src="logo.png"
+            alt="ReviewWise Logo"
+            class="reviewwise-logo">
+
+        <div>
+
+            <h2>ReviewWise</h2>
+
+            <small>Credibility Checker</small>
+
+        </div>
+
+    </div>
+
+    <button onclick="goHome()">
+        <span>Home</span>
+    </button>
+
+    <button onclick="openHistory()">
+        <span>History</span>
+    </button>
+
+    <button onclick="openAbout()">
+        <span>About</span>
+    </button>
+
+    <button onclick="openHowToUse()">
+        <span>How to Use</span>
+    </button>
+
+    <button onclick="clearHistory()">
+        <span>Clear History</span>
+    </button>
+
+</aside>
+
+
+<main class="container page-container">
+<section id="historyPanel" class="standalone-panel">
+
+    <div class="panel-header">
+
+        <div>
+
+            <span class="panel-eyebrow">
+                ReviewWise
+            </span>
+
+            <h2>Check History</h2>
+
+        </div>
+
+        <button
+            class="close-btn"
+            onclick="goHome()"
+            aria-label="Close">
+
+            ×
+
+        </button>
+
+    </div>
+
+    <div id="historyList"></div>
+
+</section>
+</main>
+
+<div id="toast" class="toast hidden">
+  <span id="toastIcon">✓</span>
+  <span id="toastMessage">Done</span>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
