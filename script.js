@@ -2168,6 +2168,36 @@ function toggleSpeechToText() {
 }
 
 
+
+/* =========================================================
+   IS IMAGE FILE (accepts any picture, even with empty MIME type)
+========================================================= */
+
+function isImageFile(file) {
+
+    if (!file) {
+        return false;
+    }
+
+    if (
+        typeof file.type === "string" &&
+        file.type.toLowerCase().startsWith("image/")
+    ) {
+        return true;
+    }
+
+    const ext =
+        (file.name || "")
+            .split(".")
+            .pop()
+            .toLowerCase();
+
+    return [
+        "jpg", "jpeg", "jpe", "jfif", "png", "gif", "webp", "bmp",
+        "heic", "heif", "avif", "tif", "tiff", "svg", "ico"
+    ].includes(ext);
+}
+
 /* =========================================================
    DRAG & DROP
 ========================================================= */
@@ -2179,7 +2209,7 @@ function routeDroppedFile(file) {
     }
 
     if (
-        file.type.startsWith("image/")
+        isImageFile(file)
     ) {
 
         runOCR(
@@ -3010,7 +3040,7 @@ function setupPhoto() {
             }
 
             if (
-                !file.type.startsWith("image/")
+                !isImageFile(file)
             ) {
 
                 showToast(
@@ -3190,13 +3220,93 @@ async function loadImageToCanvas(file) {
                 });
             };
 
-            img.onerror = () => {
+            img.onerror = async () => {
 
                 URL.revokeObjectURL(url);
 
+                /* Fallback decoder for formats <img> can't open */
+                try {
+
+                    if (
+                        typeof createImageBitmap ===
+                        "function"
+                    ) {
+
+                        const bmp =
+                            await createImageBitmap(file);
+
+                        const maxDimension = 2200;
+
+                        const scale =
+                            Math.min(
+                                1,
+                                maxDimension /
+                                Math.max(
+                                    bmp.width,
+                                    bmp.height
+                                )
+                            );
+
+                        const canvas =
+                            document.createElement(
+                                "canvas"
+                            );
+
+                        canvas.width =
+                            Math.max(
+                                1,
+                                Math.round(
+                                    bmp.width * scale
+                                )
+                            );
+
+                        canvas.height =
+                            Math.max(
+                                1,
+                                Math.round(
+                                    bmp.height * scale
+                                )
+                            );
+
+                        const bctx =
+                            canvas.getContext(
+                                "2d",
+                                {
+                                    willReadFrequently:
+                                        true
+                                }
+                            );
+
+                        bctx.drawImage(
+                            bmp,
+                            0,
+                            0,
+                            canvas.width,
+                            canvas.height
+                        );
+
+                        resolve({
+                            canvas,
+                            naturalWidth:
+                                bmp.width,
+                            naturalHeight:
+                                bmp.height
+                        });
+
+                        return;
+                    }
+
+                } catch (fallbackError) {
+
+                    console.error(
+                        "createImageBitmap fallback failed:",
+                        fallbackError
+                    );
+                }
+
                 reject(
                     new Error(
-                        "This image format can't be opened. Try a JPG or PNG photo."
+                        "This image format can't be opened by your browser. Try a JPG or PNG photo."
                     )
                 );
             };
@@ -4032,8 +4142,35 @@ async function assessImageQuality(file) {
                 sampleH
             );
 
+        /*
+         * Exposure check based on contrast, not just average brightness.
+         * Screenshots with a white background (and dark text) or dark-mode
+         * screenshots (light text) are perfectly readable, so they must
+         * NOT be flagged. Only flag when almost everything is washed out
+         * or crushed, i.e. there is no real contrast left.
+         */
+
+        let darkPixels = 0;
+        let lightPixels = 0;
+
+        for (let i = 0; i < gray.length; i++) {
+
+            if (gray[i] < 90) {
+                darkPixels++;
+            } else if (gray[i] > 200) {
+                lightPixels++;
+            }
+        }
+
+        const darkRatio =
+            darkPixels / gray.length;
+
+        const lightRatio =
+            lightPixels / gray.length;
+
         if (
-            avgBrightness < 55
+            avgBrightness < 40 &&
+            lightRatio < 0.002
         ) {
 
             warnings.push(
@@ -4041,7 +4178,8 @@ async function assessImageQuality(file) {
             );
 
         } else if (
-            avgBrightness > 225
+            avgBrightness > 240 &&
+            darkRatio < 0.002
         ) {
 
             warnings.push(
@@ -4050,7 +4188,7 @@ async function assessImageQuality(file) {
         }
 
         if (
-            sharpnessScore < 6
+            sharpnessScore < 2
         ) {
 
             warnings.push(
