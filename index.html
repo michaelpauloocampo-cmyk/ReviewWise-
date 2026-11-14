@@ -20,8 +20,6 @@
 
     <img src="logo.png" alt="ReviewWise Logo">
 
-    <link rel="icon" type="image/png" href="favicon.png">
-
     <h2>REVIEWWISE</h2>
 
     <p>AI Credibility Checker</p>
@@ -168,7 +166,7 @@
 
         <textarea
             id="newsInput"
-            placeholder="Type or Paste text here."
+            placeholder="Paste a review, post, or article here. Press Ctrl + Enter to analyze."
             maxlength="20000"></textarea>
 
         <div class="input-footer">
@@ -190,6 +188,26 @@
                 <span id="wordCount">
                     0 words
                 </span>
+
+            </div>
+
+            <div class="toolbar-actions">
+
+                <button
+                    type="button"
+                    class="tool-chip"
+                    id="sampleButton"
+                    onclick="loadSampleText()">
+                    Try a sample
+                </button>
+
+                <button
+                    type="button"
+                    class="tool-chip"
+                    id="clearInputButton"
+                    onclick="clearInputText()">
+                    Clear
+                </button>
 
             </div>
 
@@ -323,8 +341,7 @@
             <textarea
                 id="ocrReviewText"
                 class="ocr-review-textarea"
-                placeholder="Extracted text will appear here for review.">
-            </textarea>
+                placeholder="Extracted text will appear here for review."></textarea>
 
             <div class="ocr-review-actions">
 
@@ -779,6 +796,84 @@
         </div>
 
         <div id="highlightedText"></div>
+
+    </section>
+
+    <!-- =================================================
+         REFERENCES
+    ================================================== -->
+
+    <section
+        id="referencesContainer"
+        class="references-card hidden"
+        aria-labelledby="referencesTitle">
+
+        <div class="section-heading compact">
+
+            <div>
+
+                <span class="section-eyebrow">
+                    RESEARCH BASIS
+                </span>
+
+                <h3 id="referencesTitle">
+                    References
+                </h3>
+
+            </div>
+
+        </div>
+
+        <p class="references-intro">
+            The language patterns ReviewWise looks for, such as generic
+            praise, exaggerated claims, few specific details and repetitive
+            wording, come from published studies on AI-generated and fake
+            reviews. The score is a risk indicator, not proof that a text is
+            fake. You can open each source below to check it yourself.
+        </p>
+
+        <ol id="referencesList" class="references-list">
+
+            <li>
+                Markowitz, D. M., Hancock, J. T., &amp; Bailenson, J. N. (2024).
+                Linguistic markers of inherently false AI communication and
+                intentionally false human communication: Evidence from hotel
+                reviews. <em>Journal of Language and Social Psychology, 43</em>(1),
+                63&ndash;82.
+                <a
+                    href="https://doi.org/10.1177/0261927X231200201"
+                    target="_blank"
+                    rel="noopener noreferrer">
+                    https://doi.org/10.1177/0261927X231200201
+                </a>
+            </li>
+
+            <li>
+                Zhao, Y., Tang, S., Zhang, H., &amp; Lyu, L. (2025).
+                AI vs. human: A large-scale analysis of AI-generated fake
+                reviews, human-generated fake reviews and authentic reviews.
+                <em>Journal of Retailing and Consumer Services, 87</em>, 104400.
+                <a
+                    href="https://doi.org/10.1016/j.jretconser.2025.104400"
+                    target="_blank"
+                    rel="noopener noreferrer">
+                    https://doi.org/10.1016/j.jretconser.2025.104400
+                </a>
+            </li>
+
+            <li>
+                Yang, J.-L. (2025). Classification of artificial
+                intelligence-generated product reviews on Amazon.
+                <em>Engineering Proceedings, 92</em>(1), 17.
+                <a
+                    href="https://doi.org/10.3390/engproc2025092017"
+                    target="_blank"
+                    rel="noopener noreferrer">
+                    https://doi.org/10.3390/engproc2025092017
+                </a>
+            </li>
+
+        </ol>
 
     </section>
 

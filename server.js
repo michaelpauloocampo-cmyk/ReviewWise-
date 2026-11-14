@@ -26,6 +26,9 @@ const mammoth = require("mammoth");
 
 const app = express();
 
+// Behind Render's proxy, use the real visitor IP for rate limiting.
+app.set("trust proxy", 1);
+
 const PORT =
     Number(process.env.PORT) || 3000;
 
@@ -213,7 +216,14 @@ app.use(cors({
 const requestBuckets = new Map();
 const RATE_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT = Number(process.env.API_RATE_LIMIT) || 40;
-app.use("/analyze", (req, res, next) => {
+setInterval(() => {
+    const cutoff = Date.now() - RATE_WINDOW_MS;
+    for (const [key, bucket] of requestBuckets) {
+        if (bucket.start < cutoff) requestBuckets.delete(key);
+    }
+}, RATE_WINDOW_MS).unref();
+
+app.use(/^\/analyze/, (req, res, next) => {
     const key = req.ip || req.socket.remoteAddress || "unknown";
     const now = Date.now();
     let bucket = requestBuckets.get(key);
@@ -228,9 +238,6 @@ app.use("/analyze", (req, res, next) => {
     next();
 });
 
-app.get("/health", (req, res) => {
-    res.json({ status: "ok", service: "ReviewWise", timestamp: new Date().toISOString() });
-});
 
 app.get("/capabilities", (req, res) => {
     res.json({
@@ -2813,11 +2820,26 @@ app.use(
    SERVE FRONTEND
 ========================================================= */
 
-app.use(
-    express.static(
-        BASE_DIR
-    )
-);
+const PUBLIC_FILES = new Set([
+    "index.html", "about.html", "history.html", "how-to-use.html",
+    "styles.css", "script.js", "config.js",
+    "logo.png", "favicon.png"
+]);
+
+app.get("/", (req, res) => {
+    res.sendFile(path.join(BASE_DIR, "index.html"));
+});
+
+app.get("/:file", (req, res, next) => {
+    if (!PUBLIC_FILES.has(req.params.file)) {
+        return next();
+    }
+    res.sendFile(path.join(BASE_DIR, req.params.file), error => {
+        if (error && !res.headersSent) {
+            res.status(404).end();
+        }
+    });
+});
 
 
 /* =========================================================

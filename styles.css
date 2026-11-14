@@ -2611,23 +2611,6 @@ textarea::placeholder {
     color: var(--primary);
 }
 
-@media (prefers-color-scheme: dark) {
-
-    .site-footer {
-        border-top-color:
-            rgba(255, 255, 255, .1);
-    }
-
-    .site-footer-primary {
-        color:
-            rgba(255, 255, 255, .55);
-    }
-
-    .site-footer-secondary {
-        color:
-            #60a5fa;
-    }
-}
 
 @media (max-width: 480px) {
 
@@ -4255,31 +4238,59 @@ img, video, canvas {
     font-size: .92rem;
     line-height: 1.55;
 }
-.rw-theme-toggle {
-    position: fixed;
-    right: 14px;
-    bottom: 14px;
-    z-index: 999;
+
+
+/* References + usability additions */
+.input-toolbar { flex-wrap: wrap; gap: 10px; }
+.toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.tool-chip {
+    min-height: 44px;
+    padding: 0 16px;
     border: 1px solid var(--border);
     border-radius: 999px;
-    padding: 10px 14px;
     background: var(--surface);
     color: var(--text);
-    box-shadow: var(--shadow);
+    font: inherit;
+    font-size: .9rem;
     cursor: pointer;
 }
-html.rw-dark {
-    color-scheme: dark;
-    --text: #e5edf5;
-    --muted: #a7b6c6;
-    --border: #334155;
-    --surface: #172334;
-    --background: #0b1420;
-    --primary-light: #172f43;
-    --green-light: #153326;
-    --yellow-light: #382d17;
-    --red-light: #3b2025;
+.tool-chip:hover { background: var(--primary-light); }
+.tool-chip:focus-visible,
+.references-list a:focus-visible,
+#newsInput:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
 }
-html.rw-dark body { background: var(--background); color: var(--text); }
-html.rw-dark .rw-trust-notice { background: #142c3c; border-color: #315b72; color: #d5e8f3; }
-html.rw-dark input, html.rw-dark textarea, html.rw-dark select { background: #101d2c; color: var(--text); border-color: var(--border); }
+.references-card {
+    width: min(760px, calc(100% - 24px));
+    margin: 18px auto 0;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+.references-intro {
+    margin: 4px 0 14px;
+    color: var(--muted);
+    font-size: .92rem;
+    line-height: 1.6;
+}
+.references-list {
+    display: grid;
+    gap: 14px;
+    padding-left: 22px;
+    font-size: .9rem;
+    line-height: 1.6;
+    color: var(--text);
+}
+.references-list a {
+    display: block;
+    margin-top: 4px;
+    color: var(--primary);
+    overflow-wrap: anywhere;
+    padding: 6px 0;
+}
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+}

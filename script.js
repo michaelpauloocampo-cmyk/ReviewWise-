@@ -1277,6 +1277,8 @@ function renderAnalysis(analysis) {
 
     highlightedContainer.classList.remove("hidden");
 
+    $("referencesContainer")?.classList.remove("hidden");
+
 
     saveHistory(analysis);
 
@@ -1881,6 +1883,21 @@ function downloadReport() {
         explanationItems.length
             ? explanationItems.join("\n")
             : "No detailed explanations available.",
+
+        "",
+
+        "References:",
+
+        "-----------",
+
+        ...Array.from(
+            document.querySelectorAll(
+                "#referencesList li"
+            )
+        ).map(
+            (el, i) =>
+                `${i + 1}. ${el.textContent.replace(/\s+/g, " ").trim()}`
+        ),
 
         "",
 
@@ -5342,7 +5359,8 @@ function goHome() {
 
     [
         "result",
-        "highlightedContainer"
+        "highlightedContainer",
+        "referencesContainer"
     ].forEach(
         id => {
 
@@ -5967,6 +5985,22 @@ function initializeReviewWise() {
     if (input) {
 
         input.addEventListener(
+            "keydown",
+            event => {
+
+                if (
+                    (event.ctrlKey || event.metaKey) &&
+                    event.key === "Enter"
+                ) {
+
+                    event.preventDefault();
+
+                    generateResult();
+                }
+            }
+        );
+
+        input.addEventListener(
             "input",
             () => {
 
@@ -6049,9 +6083,10 @@ if (
 }
 
 /* =========================================================
-   REVIEWWISE UPGRADE: TRANSPARENT ANALYSIS NOTICE + THEME
+   REVIEWWISE UPGRADE: TRANSPARENT ANALYSIS NOTICE
 ========================================================= */
 (function addReviewWiseEnhancements() {
+    try { localStorage.removeItem("reviewwiseTheme"); } catch (_) {}
     function mountEnhancements() {
         if (!document.getElementById("rwTrustNotice")) {
             const notice = document.createElement("aside");
@@ -6062,30 +6097,53 @@ if (
             const hero = document.querySelector(".hero");
             if (hero) hero.insertAdjacentElement("afterend", notice);
         }
-        if (!document.getElementById("rwThemeToggle")) {
-            const button = document.createElement("button");
-            button.id = "rwThemeToggle";
-            button.type = "button";
-            button.className = "rw-theme-toggle";
-            button.textContent = document.documentElement.dataset.rwTheme === "dark" ? "☀ Light mode" : "◐ Dark mode";
-            button.setAttribute("aria-label", "Toggle dark mode");
-            button.addEventListener("click", () => {
-                const dark = document.documentElement.classList.toggle("rw-dark");
-                document.documentElement.dataset.rwTheme = dark ? "dark" : "light";
-                try { localStorage.setItem("reviewwiseTheme", dark ? "dark" : "light"); } catch (_) {}
-                button.textContent = dark ? "☀ Light mode" : "◐ Dark mode";
-            });
-            document.body.appendChild(button);
-        }
-        try {
-            if (localStorage.getItem("reviewwiseTheme") === "dark") {
-                document.documentElement.classList.add("rw-dark");
-                document.documentElement.dataset.rwTheme = "dark";
-                const toggle = document.getElementById("rwThemeToggle");
-                if (toggle) toggle.textContent = "☀ Light mode";
-            }
-        } catch (_) {}
     }
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mountEnhancements, { once: true });
     else mountEnhancements();
 })();
+
+
+/* =========================================================
+   USABILITY HELPERS
+========================================================= */
+
+const SAMPLE_REVIEW =
+    "Overall, this product is an excellent choice! " +
+    "The design and quality are exceptional. " +
+    "It exceeded all my expectations and is a game-changer. " +
+    "I highly recommend this product to anyone. " +
+    "Guaranteed to be worth every penny!!!";
+
+function loadSampleText() {
+
+    const input = $("newsInput");
+
+    if (!input) {
+        return;
+    }
+
+    input.value = SAMPLE_REVIEW;
+
+    updateCharacterCount();
+
+    updateWordCount();
+
+    input.focus();
+}
+
+function clearInputText() {
+
+    const input = $("newsInput");
+
+    if (!input || !input.value) {
+        return;
+    }
+
+    input.value = "";
+
+    updateCharacterCount();
+
+    updateWordCount();
+
+    input.focus();
+}
