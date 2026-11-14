@@ -3912,27 +3912,64 @@ function getOcrWorker() {
         return ocrWorkerPromise;
     }
 
+    /* Show real loading progress instead of a frozen message */
     const logger =
         info => {
 
             if (typeof ocrProgressHandler === "function") {
                 ocrProgressHandler(info);
             }
+
+            if (
+                info &&
+                info.status &&
+                info.status !== "recognizing text"
+            ) {
+
+                const pct =
+                    Number.isFinite(info.progress)
+                        ? ` ${Math.round(info.progress * 100)}%`
+                        : "";
+
+                setStatus(
+                    `Loading text reader...${pct} (first time may take a moment)`,
+                    true
+                );
+            }
         };
+
+    const withTimeout =
+        (promise, ms, label) =>
+            Promise.race([
+                promise,
+                new Promise(
+                    (_, reject) =>
+                        setTimeout(
+                            () => reject(
+                                new Error(`${label} timed out`)
+                            ),
+                            ms
+                        )
+                )
+            ]);
 
     ocrWorkerPromise =
         (async () => {
 
-            let worker;
+            let worker = null;
 
+            /* 1) English + Tagalog (bigger download) with a time limit */
             try {
 
-                /* English + Tagalog for Taglish reviews */
                 worker =
-                    await Tesseract.createWorker(
-                        "eng+tgl",
-                        1,
-                        { logger }
+                    await withTimeout(
+                        Tesseract.createWorker(
+                            "eng+tgl",
+                            1,
+                            { logger }
+                        ),
+                        40000,
+                        "Loading English + Tagalog"
                     );
 
             } catch (languageError) {
@@ -3941,19 +3978,46 @@ function getOcrWorker() {
                     "Tagalog data unavailable, using English only:",
                     languageError
                 );
-
-                worker =
-                    await Tesseract.createWorker(
-                        "eng",
-                        1,
-                        { logger }
-                    );
             }
 
-            await worker.setParameters({
-                preserve_interword_spaces: "1",
-                user_defined_dpi: "300"
-            });
+            /* 2) Fallback: English only (smaller, faster) */
+            if (!worker) {
+
+                try {
+
+                    worker =
+                        await withTimeout(
+                            Tesseract.createWorker(
+                                "eng",
+                                1,
+                                { logger }
+                            ),
+                            60000,
+                            "Loading English"
+                        );
+
+                } catch (englishError) {
+
+                    throw new Error(
+                        "Text reader could not load. Check your internet connection and try again."
+                    );
+                }
+            }
+
+            try {
+
+                await worker.setParameters({
+                    preserve_interword_spaces: "1",
+                    user_defined_dpi: "300"
+                });
+
+            } catch (paramError) {
+
+                console.warn(
+                    "OCR parameters not applied:",
+                    paramError
+                );
+            }
 
             return worker;
         })();
