@@ -443,7 +443,10 @@ const wordCategories = {
         "i highly recommend this product to anyone",
         "this product offers great value for money",
         "the quality is outstanding",
-        "it is easy to use and performs exceptionally well"
+        "it is easy to use and performs exceptionally well" ,
+        "Napakaganda ng kalidad.”,
+        "Talagang sulit sa presyo.”,
+       "Nagbibigay ng mahusay na karanasan.”,
 
     ]
 
