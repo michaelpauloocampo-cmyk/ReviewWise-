@@ -405,25 +405,21 @@ const fileUpload =
 ========================================================= */
 
 const wordCategories = {
-
     clickbait: [
-
         "shocking",
         "breaking",
         "viral",
         "click here",
         "share this"
-
     ],
 
     misleading: [
-
         "guaranteed",
         "101%",
         "unbelievable",
         "secret",
 
-        // Promotional and exaggerated language
+        // English promotional phrases
         "highly recommend",
         "exceeded all my expectations",
         "game-changer",
@@ -443,13 +439,13 @@ const wordCategories = {
         "i highly recommend this product to anyone",
         "this product offers great value for money",
         "the quality is outstanding",
-        "it is easy to use and performs exceptionally well" ,
-        "Napakaganda ng kalidad.”,
-        "Talagang sulit sa presyo.”,
-       "Nagbibigay ng mahusay na karanasan.”,
+        "it is easy to use and performs exceptionally well",
 
+        // Tagalog promotional phrases
+        "napakaganda ng kalidad",
+        "talagang sulit sa presyo",
+        "nagbibigay ng mahusay na karanasan"
     ]
-
 };
 
 
