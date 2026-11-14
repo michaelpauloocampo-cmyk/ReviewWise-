@@ -409,13 +409,9 @@ const wordCategories = {
     clickbait: [
 
         "shocking",
-
         "breaking",
-
         "viral",
-
         "click here",
-
         "share this"
 
     ],
@@ -423,12 +419,31 @@ const wordCategories = {
     misleading: [
 
         "guaranteed",
-
         "101%",
-
         "unbelievable",
+        "secret",
 
-        "secret"
+        // Promotional and exaggerated language
+        "highly recommend",
+        "exceeded all my expectations",
+        "game-changer",
+        "exceptional quality",
+        "worth every penny",
+        "top-notch",
+        "without a doubt",
+        "excellent value",
+        "perfect for anyone",
+        "well-designed",
+        "impressive",
+        "outstanding performance",
+        "i highly recommend this product",
+        "overall, this product is an excellent choice",
+        "the design and quality are exceptional",
+        "it exceeded all my expectations",
+        "i highly recommend this product to anyone",
+        "this product offers great value for money",
+        "the quality is outstanding",
+        "it is easy to use and performs exceptionally well"
 
     ]
 
