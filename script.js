@@ -16,7 +16,6 @@ let uploadedFileKind = null;
 let cameraStream = null;
 let capturedCameraBlob = null;
 let currentPreviewObjectURL = null;
-let currentVideoObjectURL = null;
 
 let isProcessing = false;
 
@@ -29,6 +28,10 @@ let lastOcrRaw = "";
 let lastOcrClean = "";
 let lastOcrQuality = null;
 let lastOcrSourceKind = null;
+
+/* Shared Tesseract worker (loaded once, reused for every pass) */
+let ocrWorkerPromise = null;
+let ocrProgressHandler = null;
 
 /* Drag & drop counter */
 let dragDepth = 0;
@@ -1472,20 +1475,6 @@ async function generateResult() {
     }
 
 
-    /* VIDEO */
-
-    if (
-        uploadedFile &&
-        uploadedFileKind === "video"
-    ) {
-
-        return analyzeMedia(
-            uploadedFile,
-            "video",
-            "/analyze-video",
-            "video"
-        );
-    }
 
 
     /* FILE */
@@ -1527,29 +1516,15 @@ async function analyzeMedia(
 
     setLoading(
         true,
-        contentType === "video"
-            ? "Scanning video..."
-            : "Processing..."
+        "Processing..."
     );
 
-
-    if (contentType === "video") {
-
-        showVideoProgress(
-            10,
-            "Uploading video..."
-        );
-
-    } else {
-
-        setStatus(
-            contentType === "image"
-                ? "Processing image..."
-                : "Extracting file text...",
-            true
-        );
-    }
-
+    setStatus(
+        contentType === "image"
+            ? "Processing image..."
+            : "Extracting file text...",
+        true
+    );
 
     try {
 
@@ -1561,16 +1536,6 @@ async function analyzeMedia(
             file
         );
 
-
-        if (contentType === "video") {
-
-            showVideoProgress(
-                20,
-                "Scanning video frames..."
-            );
-        }
-
-
         const response =
             await fetchWithTimeout(
                 `${API_BASE}${endpoint}`,
@@ -1580,22 +1545,10 @@ async function analyzeMedia(
                 }
             );
 
-
-        if (contentType === "video") {
-
-            showVideoProgress(
-                85,
-                "Analyzing extracted text..."
-            );
-
-        } else {
-
-            setStatus(
-                "Analyzing extracted content...",
-                true
-            );
-        }
-
+        setStatus(
+            "Analyzing extracted content...",
+            true
+        );
 
         const data =
             await getJsonResponse(response);
@@ -1603,9 +1556,7 @@ async function analyzeMedia(
         data.contentType =
             contentType;
 
-
         renderAnalysis(data);
-
 
         if (
             endpoint === "/analyze-image"
@@ -1616,27 +1567,26 @@ async function analyzeMedia(
             );
         }
 
+        if (data.truncated) {
 
-        if (contentType === "video") {
-
-            showVideoProgress(
-                100,
-                "Video scan complete."
+            showToast(
+                "Only the first part of this file was analyzed.",
+                "warning"
             );
 
-            setTimeout(
-                () => {
-                    hideVideoProgress();
-                },
-                1000
+        } else if (data.ocrUsed) {
+
+            showToast(
+                `Scanned PDF read with OCR (first ${data.ocrPages || 1} page(s)). Check the text for mistakes.`,
+                "warning"
+            );
+
+        } else {
+
+            showToast(
+                "Analysis complete."
             );
         }
-
-
-        showToast(
-            "Analysis complete."
-        );
-
 
     } catch (error) {
 
@@ -1644,10 +1594,6 @@ async function analyzeMedia(
             "MEDIA ANALYSIS ERROR:",
             error
         );
-
-        if (contentType === "video") {
-            hideVideoProgress();
-        }
 
         handleRequestError(
             error,
@@ -2257,31 +2203,6 @@ function routeDroppedFile(file) {
         return;
     }
 
-    if (
-        file.type.startsWith("video/")
-    ) {
-
-        const videoInput =
-            $("video");
-
-        if (videoInput) {
-
-            const dt =
-                new DataTransfer();
-
-            dt.items.add(file);
-
-            videoInput.files =
-                dt.files;
-
-            videoInput.dispatchEvent(
-                new Event("change")
-            );
-        }
-
-        return;
-    }
-
     const extension =
         file.name
             .split(".")
@@ -2315,7 +2236,7 @@ function routeDroppedFile(file) {
     }
 
     showToast(
-        "Unsupported file type. Use an image, video, PDF, DOCX, or TXT.",
+        "Unsupported file type. Use an image, PDF, DOCX, or TXT.",
         "error"
     );
 }
@@ -3275,7 +3196,7 @@ async function loadImageToCanvas(file) {
 
                 reject(
                     new Error(
-                        "Unable to load image."
+                        "This image format can't be opened. Try a JPG or PNG photo."
                     )
                 );
             };
@@ -3566,14 +3487,191 @@ function applySharpen(
    BUILD OCR VARIANTS
 ========================================================= */
 
+function applyAdaptiveThreshold(
+    imageData,
+    bias = 0.15
+) {
+
+    const {
+        data,
+        width,
+        height
+    } = imageData;
+
+    const gray =
+        new Uint8Array(width * height);
+
+    for (
+        let i = 0, p = 0;
+        i < data.length;
+        i += 4, p++
+    ) {
+
+        gray[p] =
+            (
+                data[i] * 299 +
+                data[i + 1] * 587 +
+                data[i + 2] * 114
+            ) / 1000;
+    }
+
+    const stride = width + 1;
+
+    const integral =
+        new Uint32Array(
+            stride * (height + 1)
+        );
+
+    for (let y = 1; y <= height; y++) {
+
+        let rowSum = 0;
+
+        for (let x = 1; x <= width; x++) {
+
+            rowSum +=
+                gray[(y - 1) * width + (x - 1)];
+
+            integral[y * stride + x] =
+                integral[(y - 1) * stride + x] +
+                rowSum;
+        }
+    }
+
+    const half =
+        Math.max(
+            7,
+            Math.round(width / 16)
+        );
+
+    for (let y = 0; y < height; y++) {
+
+        const y1 = Math.max(0, y - half);
+        const y2 = Math.min(height - 1, y + half);
+
+        for (let x = 0; x < width; x++) {
+
+            const x1 = Math.max(0, x - half);
+            const x2 = Math.min(width - 1, x + half);
+
+            const count =
+                (x2 - x1 + 1) *
+                (y2 - y1 + 1);
+
+            const sum =
+                integral[(y2 + 1) * stride + (x2 + 1)] -
+                integral[y1 * stride + (x2 + 1)] -
+                integral[(y2 + 1) * stride + x1] +
+                integral[y1 * stride + x1];
+
+            const value =
+                gray[y * width + x] * count <
+                sum * (1 - bias)
+                    ? 0
+                    : 255;
+
+            const idx =
+                (y * width + x) * 4;
+
+            data[idx] = value;
+            data[idx + 1] = value;
+            data[idx + 2] = value;
+            data[idx + 3] = 255;
+        }
+    }
+}
+
+
 async function buildOcrVariants(file) {
 
     const {
-        canvas,
+        canvas: sourceCanvas,
         naturalWidth,
         naturalHeight
     } =
         await loadImageToCanvas(file);
+
+    /* 1. Dark screenshots (light text on dark background) -> invert */
+
+    const sourceCtx =
+        sourceCanvas.getContext(
+            "2d",
+            {
+                willReadFrequently:
+                    true
+            }
+        );
+
+    const sourceData =
+        sourceCtx.getImageData(
+            0,
+            0,
+            sourceCanvas.width,
+            sourceCanvas.height
+        );
+
+    const px = sourceData.data;
+
+    let luminanceSum = 0;
+    let sampled = 0;
+
+    for (let i = 0; i < px.length; i += 16) {
+
+        luminanceSum +=
+            (
+                px[i] * 299 +
+                px[i + 1] * 587 +
+                px[i + 2] * 114
+            ) / 1000;
+
+        sampled++;
+    }
+
+    const isDark =
+        sampled > 0 &&
+        luminanceSum / sampled < 100;
+
+    if (isDark) {
+
+        for (let i = 0; i < px.length; i += 4) {
+
+            px[i] = 255 - px[i];
+            px[i + 1] = 255 - px[i + 1];
+            px[i + 2] = 255 - px[i + 2];
+        }
+
+        sourceCtx.putImageData(
+            sourceData,
+            0,
+            0
+        );
+    }
+
+    /* 2. Upscale small images and add a white margin around the text */
+
+    const PAD = 24;
+
+    const longSide =
+        Math.max(
+            sourceCanvas.width,
+            sourceCanvas.height
+        );
+
+    const upscale =
+        longSide < 1400
+            ? Math.min(3, 1800 / longSide)
+            : 1;
+
+    const scaledWidth =
+        Math.round(sourceCanvas.width * upscale);
+
+    const scaledHeight =
+        Math.round(sourceCanvas.height * upscale);
+
+    const canvas =
+        document.createElement("canvas");
+
+    canvas.width = scaledWidth + PAD * 2;
+    canvas.height = scaledHeight + PAD * 2;
 
     const ctx =
         canvas.getContext(
@@ -3584,127 +3682,179 @@ async function buildOcrVariants(file) {
             }
         );
 
+    ctx.fillStyle = "#ffffff";
+
+    ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
+    ctx.drawImage(
+        sourceCanvas,
+        PAD,
+        PAD,
+        scaledWidth,
+        scaledHeight
+    );
+
+    const base =
+        ctx.getImageData(
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+
+    /* 3. Build independent variants (each starts from the same base) */
+
     const variants = [];
 
+    const addVariant =
+        async (name, psm, transform) => {
 
-    /* PASS 1 */
+            const copy =
+                new ImageData(
+                    new Uint8ClampedArray(base.data),
+                    base.width,
+                    base.height
+                );
 
-    {
+            transform(copy);
 
-        const data =
-            cloneImageData(
-                ctx,
-                canvas
+            ctx.putImageData(copy, 0, 0);
+
+            variants.push({
+                name,
+                psm,
+                blob:
+                    await canvasToBlob(canvas)
+            });
+        };
+
+    /* Normal text, even lighting */
+    await addVariant(
+        "contrast",
+        "3",
+        data =>
+            applyGrayscaleContrast(
+                data.data,
+                1.45,
+                128
+            )
+    );
+
+    /* Uneven lighting, shadows, photos of paper or screens */
+    await addVariant(
+        "adaptive",
+        "3",
+        data =>
+            applyAdaptiveThreshold(data)
+    );
+
+    /* One block of text (a paragraph or a review) */
+    await addVariant(
+        "sharpened-block",
+        "6",
+        data => {
+
+            applyGrayscaleContrast(
+                data.data,
+                1.2,
+                128
             );
 
-        applyGrayscaleContrast(
-            data.data,
-            1.45,
-            128
-        );
-
-        ctx.putImageData(
-            data,
-            0,
-            0
-        );
-
-        variants.push({
-
-            name: "contrast",
-
-            blob:
-                await canvasToBlob(
-                    canvas
-                )
-
-        });
-    }
-
-
-    /* PASS 2 */
-
-    {
-
-        const data =
-            cloneImageData(
-                ctx,
+            applySharpen(
+                data,
                 canvas
             );
+        }
+    );
 
-        applyThreshold(
-            data.data,
-            150
-        );
-
-        ctx.putImageData(
-            data,
-            0,
-            0
-        );
-
-        variants.push({
-
-            name: "threshold",
-
-            blob:
-                await canvasToBlob(
-                    canvas
-                )
-
-        });
-    }
-
-
-    /* PASS 3 */
-
-    {
-
-        const data =
-            cloneImageData(
-                ctx,
-                canvas
-            );
-
-        applyGrayscaleContrast(
-            data.data,
-            1.2,
-            128
-        );
-
-        applySharpen(
-            data,
-            canvas
-        );
-
-        ctx.putImageData(
-            data,
-            0,
-            0
-        );
-
-        variants.push({
-
-            name: "sharpened",
-
-            blob:
-                await canvasToBlob(
-                    canvas
-                )
-
-        });
-    }
-
+    /* Scattered text (screenshots, labels, memes) */
+    await addVariant(
+        "adaptive-sparse",
+        "11",
+        data =>
+            applyAdaptiveThreshold(data)
+    );
 
     return {
-
         variants,
-
         naturalWidth,
-
-        naturalHeight
-
+        naturalHeight,
+        inverted: isDark
     };
+}
+
+
+/* =========================================================
+   SHARED OCR WORKER
+========================================================= */
+
+function getOcrWorker() {
+
+    if (ocrWorkerPromise) {
+        return ocrWorkerPromise;
+    }
+
+    const logger =
+        info => {
+
+            if (typeof ocrProgressHandler === "function") {
+                ocrProgressHandler(info);
+            }
+        };
+
+    ocrWorkerPromise =
+        (async () => {
+
+            let worker;
+
+            try {
+
+                /* English + Tagalog for Taglish reviews */
+                worker =
+                    await Tesseract.createWorker(
+                        "eng+tgl",
+                        1,
+                        { logger }
+                    );
+
+            } catch (languageError) {
+
+                console.warn(
+                    "Tagalog data unavailable, using English only:",
+                    languageError
+                );
+
+                worker =
+                    await Tesseract.createWorker(
+                        "eng",
+                        1,
+                        { logger }
+                    );
+            }
+
+            await worker.setParameters({
+                preserve_interword_spaces: "1",
+                user_defined_dpi: "300"
+            });
+
+            return worker;
+        })();
+
+    ocrWorkerPromise.catch(
+        () => {
+            ocrWorkerPromise = null;
+        }
+    );
+
+    return ocrWorkerPromise;
 }
 
 
@@ -4492,8 +4642,15 @@ async function runOCR(
 
 
         /* OCR */
-
         let best = null;
+
+        setStatus(
+            "Loading text reader... (first time may take a moment)",
+            true
+        );
+
+        const worker =
+            await getOcrWorker();
 
         for (
             let i = 0;
@@ -4509,39 +4666,41 @@ async function runOCR(
                 true
             );
 
+            ocrProgressHandler =
+                info => {
+
+                    if (
+                        info.status ===
+                        "recognizing text"
+                    ) {
+
+                        const progress =
+                            Math.round(
+                                (
+                                    info.progress ||
+                                    0
+                                ) * 100
+                            );
+
+                        setStatus(
+                            `Reading text... (pass ${i + 1} of ${variants.length}) ${progress}%`,
+                            true
+                        );
+                    }
+                };
+
             let result;
 
             try {
 
+                await worker.setParameters({
+                    tessedit_pageseg_mode:
+                        variant.psm || "3"
+                });
+
                 result =
-                    await Tesseract.recognize(
-                        variant.blob,
-                        "eng",
-                        {
-
-                            logger:
-                                info => {
-
-                                    if (
-                                        info.status ===
-                                        "recognizing text"
-                                    ) {
-
-                                        const progress =
-                                            Math.round(
-                                                (
-                                                    info.progress ||
-                                                    0
-                                                ) * 100
-                                            );
-
-                                        setStatus(
-                                            `Reading text... (pass ${i + 1} of ${variants.length}) ${progress}%`,
-                                            true
-                                        );
-                                    }
-                                }
-                        }
+                    await worker.recognize(
+                        variant.blob
                     );
 
             } catch (passError) {
@@ -4583,26 +4742,22 @@ async function runOCR(
             ) {
 
                 best = {
-
                     rawText,
-
                     cleanedText,
-
                     quality,
-
                     variant:
                         variant.name
-
                 };
             }
 
             if (
-                quality.score >= 90
+                quality.score >= 88
             ) {
-
                 break;
             }
         }
+
+        ocrProgressHandler = null;
 
 
         setStatus(
@@ -4712,198 +4867,6 @@ async function runOCR(
 
 
 /* =========================================================
-   VIDEO PICKER
-========================================================= */
-
-function openVideoPicker() {
-
-    closeUploadMenu();
-
-    const video =
-        $("video");
-
-    if (!video) {
-
-        showToast(
-            "Video picker is unavailable.",
-            "error"
-        );
-
-        return;
-    }
-
-    video.click();
-}
-
-
-/* =========================================================
-   VIDEO SETUP
-========================================================= */
-
-function setupVideo() {
-
-    const videoInput =
-        $("video");
-
-    const previewVideo =
-        $("previewVideo");
-
-    const videoContainer =
-        $("videoContainer");
-
-    if (!videoInput) {
-        return;
-    }
-
-    videoInput.addEventListener(
-        "change",
-        function () {
-
-            const file =
-                this.files?.[0];
-
-            if (!file) {
-                return;
-            }
-
-            if (
-                !file.type.startsWith(
-                    "video/"
-                )
-            ) {
-
-                showToast(
-                    "Please select a valid video file.",
-                    "error"
-                );
-
-                this.value = "";
-
-                return;
-            }
-
-            uploadedFile =
-                file;
-
-            uploadedFileKind =
-                "video";
-
-            if (
-                currentVideoObjectURL
-            ) {
-
-                URL.revokeObjectURL(
-                    currentVideoObjectURL
-                );
-            }
-
-            currentVideoObjectURL =
-                URL.createObjectURL(
-                    file
-                );
-
-            if (previewVideo) {
-
-                previewVideo.src =
-                    currentVideoObjectURL;
-
-                previewVideo.load();
-            }
-
-            if (videoContainer) {
-
-                videoContainer.classList.remove(
-                    "hidden"
-                );
-            }
-
-            hideOtherPreviews("video");
-
-            closeUploadMenu();
-
-            showToast(
-                "Video ready. Tap Analyze Content."
-            );
-
-            this.value = "";
-        }
-    );
-}
-
-
-/* =========================================================
-   VIDEO PROGRESS
-========================================================= */
-
-function showVideoProgress(
-    percent,
-    text
-) {
-
-    const area =
-        $("videoProgress");
-
-    const bar =
-        $("videoProgressBar");
-
-    const label =
-        $("videoProgressText");
-
-    const number =
-        $("videoProgressPercent");
-
-    if (area) {
-
-        area.classList.remove(
-            "hidden"
-        );
-    }
-
-    const value =
-        Math.max(
-            0,
-            Math.min(
-                100,
-                Number(percent) || 0
-            )
-        );
-
-    if (bar) {
-
-        bar.style.width =
-            `${value}%`;
-    }
-
-    if (label) {
-
-        label.textContent =
-            text ||
-            "Scanning video...";
-    }
-
-    if (number) {
-
-        number.textContent =
-            `${Math.round(value)}%`;
-    }
-}
-
-
-function hideVideoProgress() {
-
-    const area =
-        $("videoProgress");
-
-    if (area) {
-
-        area.classList.add(
-            "hidden"
-        );
-    }
-}
-
-
-/* =========================================================
    FILE PICKER
 ========================================================= */
 
@@ -4989,6 +4952,30 @@ function setupFile() {
                 return;
             }
 
+            if (file.size > 20 * 1024 * 1024) {
+
+                showToast(
+                    "That file is larger than 20 MB. Try a smaller file.",
+                    "error"
+                );
+
+                this.value = "";
+
+                return;
+            }
+
+            /* TXT files are read right here: instant, and works even if the server is asleep */
+            if (extension === "txt") {
+
+                loadTextFileIntoInput(file);
+
+                closeUploadMenu();
+
+                this.value = "";
+
+                return;
+            }
+
             uploadedFile =
                 file;
 
@@ -4996,6 +4983,7 @@ function setupFile() {
                 "file";
 
             if (fileNamePreview) {
+
 
                 fileNamePreview.textContent =
                     file.name;
@@ -5037,22 +5025,12 @@ function hideOtherPreviews(current) {
     const image =
         $("imageContainer");
 
-    const video =
-        $("videoContainer");
-
     const file =
         $("fileContainer");
 
     if (current !== "image") {
 
         image?.classList.add(
-            "hidden"
-        );
-    }
-
-    if (current !== "video") {
-
-        video?.classList.add(
             "hidden"
         );
     }
@@ -5087,21 +5065,9 @@ function removeCurrentMedia() {
     }
 
 
-    if (currentVideoObjectURL) {
-
-        URL.revokeObjectURL(
-            currentVideoObjectURL
-        );
-
-        currentVideoObjectURL = null;
-    }
-
 
     const previewImage =
         $("previewImage");
-
-    const previewVideo =
-        $("previewVideo");
 
 
     if (previewImage) {
@@ -5112,21 +5078,9 @@ function removeCurrentMedia() {
     }
 
 
-    if (previewVideo) {
-
-        previewVideo.pause();
-
-        previewVideo.removeAttribute(
-            "src"
-        );
-
-        previewVideo.load();
-    }
-
 
     [
         "imageContainer",
-        "videoContainer",
         "fileContainer"
     ].forEach(
         id => {
@@ -5943,13 +5897,11 @@ window.addEventListener(
             );
         }
 
-        if (
-            currentVideoObjectURL
-        ) {
+        if (ocrWorkerPromise) {
 
-            URL.revokeObjectURL(
-                currentVideoObjectURL
-            );
+            ocrWorkerPromise
+                .then(worker => worker.terminate())
+                .catch(() => {});
         }
     }
 );
@@ -5966,8 +5918,6 @@ function initializeReviewWise() {
     );
 
     setupPhoto();
-
-    setupVideo();
 
     setupFile();
 
@@ -6146,4 +6096,121 @@ function clearInputText() {
     updateWordCount();
 
     input.focus();
+}
+
+
+/* =========================================================
+   LOCAL TXT FILE READER
+========================================================= */
+
+async function loadTextFileIntoInput(file) {
+
+    const input = $("newsInput");
+
+    if (!input) {
+        return;
+    }
+
+    try {
+
+        const bytes =
+            new Uint8Array(
+                await file.arrayBuffer()
+            );
+
+        let text;
+
+        if (
+            bytes.length >= 2 &&
+            bytes[0] === 0xFF &&
+            bytes[1] === 0xFE
+        ) {
+
+            text =
+                new TextDecoder("utf-16le")
+                    .decode(bytes.subarray(2));
+
+        } else if (
+            bytes.length >= 2 &&
+            bytes[0] === 0xFE &&
+            bytes[1] === 0xFF
+        ) {
+
+            text =
+                new TextDecoder("utf-16be")
+                    .decode(bytes.subarray(2));
+
+        } else {
+
+            try {
+
+                text =
+                    new TextDecoder(
+                        "utf-8",
+                        { fatal: true }
+                    ).decode(bytes);
+
+            } catch (decodeError) {
+
+                text =
+                    new TextDecoder("windows-1252")
+                        .decode(bytes);
+            }
+        }
+
+        text = text.replace(/^\uFEFF/, "").trim();
+
+        if (!text) {
+
+            showToast(
+                "This text file is empty.",
+                "warning"
+            );
+
+            return;
+        }
+
+        const limit =
+            Number(input.maxLength) > 0
+                ? input.maxLength
+                : 20000;
+
+        const wasCut =
+            text.length > limit;
+
+        uploadedFile = null;
+        uploadedFileKind = null;
+
+        hideOtherPreviews("none");
+
+        input.value =
+            text.slice(0, limit);
+
+        updateCharacterCount();
+
+        updateWordCount();
+
+        input.focus();
+
+        showToast(
+            wasCut
+                ? "Text loaded (first 20,000 characters). Tap Analyze Content."
+                : "Text loaded. Tap Analyze Content.",
+            wasCut
+                ? "warning"
+                : "success"
+        );
+
+    } catch (error) {
+
+        console.error(
+            "TXT READ ERROR:",
+            error
+        );
+
+        showToast(
+            "Couldn't read this text file.",
+            "error"
+        );
+    }
 }

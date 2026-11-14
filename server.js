@@ -12,8 +12,6 @@ const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 
-const ffmpeg = require("fluent-ffmpeg");
-const ffmpegPath = require("ffmpeg-static");
 
 const vision = require("@google-cloud/vision");
 const pdfParse = require("pdf-parse");
@@ -243,7 +241,7 @@ app.get("/capabilities", (req, res) => {
     res.json({
         textPatternAnalysis: true,
         imageOcr: Boolean(visionClient),
-        videoFrameOcr: Boolean(visionClient && ffmpegPath),
+        scannedPdfOcr: Boolean(visionClient),
         pdfAndDocxExtraction: true,
         liveFactChecking: false,
         accounts: false,
@@ -265,35 +263,6 @@ app.use(
         limit: "10mb"
     })
 );
-
-
-/* =========================================================
-   FFMPEG
-========================================================= */
-
-if (
-    ffmpegPath
-) {
-
-    ffmpeg.setFfmpegPath(
-        ffmpegPath
-    );
-
-
-    console.log(
-        "FFmpeg found:"
-    );
-
-    console.log(
-        ffmpegPath
-    );
-
-} else {
-
-    console.warn(
-        "WARNING: ffmpeg-static did not provide an FFmpeg binary."
-    );
-}
 
 
 /* =========================================================
@@ -339,57 +308,6 @@ const imageUpload =
                     cb(
                         new Error(
                             "Please upload an image file."
-                        )
-                    );
-                }
-            }
-
-    });
-
-
-/* =========================================================
-   MULTER - VIDEO UPLOAD
-========================================================= */
-
-const videoUpload =
-    multer({
-
-        dest:
-            uploadsDir,
-
-        limits: {
-
-            fileSize:
-                60 *
-                1024 *
-                1024
-
-        },
-
-        fileFilter:
-            (
-                req,
-                file,
-                cb
-            ) => {
-
-                if (
-                    file.mimetype &&
-                    file.mimetype.startsWith(
-                        "video/"
-                    )
-                ) {
-
-                    cb(
-                        null,
-                        true
-                    );
-
-                } else {
-
-                    cb(
-                        new Error(
-                            "Please upload a video file."
                         )
                     );
                 }
@@ -1432,9 +1350,32 @@ async function runVisionOnFile(
         result.fullTextAnnotation;
 
 
-    const rawText =
+    let rawText =
         fullText?.text ||
         "";
+
+    /* Screenshots and scattered text: retry with sparse-text detection. */
+    if (!rawText.trim()) {
+        try {
+            const [fallback] =
+                await visionClient.textDetection({
+                    image: {
+                        source: {
+                            filename: filePath
+                        }
+                    }
+                });
+            rawText =
+                fallback?.fullTextAnnotation?.text ||
+                fallback?.textAnnotations?.[0]?.description ||
+                "";
+        } catch (fallbackError) {
+            console.warn(
+                "Vision sparse-text fallback failed:",
+                fallbackError.message
+            );
+        }
+    }
 
 
     const highlightedWords = [];
@@ -2046,453 +1987,65 @@ app.post(
 
 
 /* =========================================================
-   VIDEO FRAME EXTRACTION
+   FILE TEXT HELPERS
 ========================================================= */
 
-function extractVideoFrames(
-    videoPath,
-    framesDir
-) {
+const MAX_TEXT_CHARS = 20000;
+const MAX_PDF_PAGES = 100;
+const MAX_PDF_OCR_PAGES = 5;
 
-    return new Promise(
-        (
-            resolve,
-            reject
-        ) => {
-
-            ffmpeg(
-                videoPath
-            )
-
-                .on(
-                    "start",
-                    command => {
-
-                        console.log(
-                            "FFmpeg command started:"
-                        );
-
-                        console.log(
-                            command
-                        );
-                    }
-                )
-
-                .on(
-                    "end",
-                    () => {
-
-                        console.log(
-                            "Video frames extracted."
-                        );
-
-                        resolve();
-                    }
-                )
-
-                .on(
-                    "error",
-                    error => {
-
-                        console.error(
-                            "FFmpeg error:",
-                            error.message
-                        );
-
-                        reject(
-                            error
-                        );
-                    }
-                )
-
-                .screenshots({
-
-                    count:
-                        6,
-
-                    folder:
-                        framesDir,
-
-                    filename:
-                        "frame-%i.png"
-
-                });
-        }
-    );
+/* Reads TXT files correctly even with a BOM, UTF-16, or old Windows encodings. */
+function decodeTextBuffer(buf) {
+    if (buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) {
+        return buf.subarray(3).toString("utf8");
+    }
+    if (buf.length >= 2 && buf[0] === 0xFF && buf[1] === 0xFE) {
+        return buf.subarray(2).toString("utf16le");
+    }
+    if (buf.length >= 2 && buf[0] === 0xFE && buf[1] === 0xFF) {
+        const swapped = Buffer.from(buf.subarray(2));
+        const even = swapped.subarray(0, swapped.length - (swapped.length % 2));
+        even.swap16();
+        return even.toString("utf16le");
+    }
+    const utf8 = buf.toString("utf8");
+    return utf8.includes("\uFFFD") ? buf.toString("latin1") : utf8;
 }
 
-
-/* =========================================================
-   NORMALIZE VIDEO LINE
-========================================================= */
-
-function normalizeVideoLine(
-    line
-) {
-
-    return normalizeText(
-        line
-    )
-
-        .replace(
-            /[^a-z0-9%!?.,:'"-]+/g,
-            " "
-        )
-
+/* Joins lines that PDFs and scans break in the middle of a sentence. */
+function reflowExtractedText(text) {
+    return String(text || "")
+        .replace(/\r/g, "")
+        .replace(/\f/g, "\n\n")
+        .replace(/(\w)-\n(?=[a-z])/g, "$1")
+        .replace(/([^\n.!?:;"”)\]])\n(?!\n|\s*(?:[-•*]|\d+[.)])\s)/g, "$1 ")
+        .replace(/[ \t]+/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
         .trim();
 }
 
-
-/* =========================================================
-   POST /analyze-video
-========================================================= */
-
-app.post(
-    "/analyze-video",
-
-    videoUpload.single(
-        "video"
-    ),
-
-    async (
-        req,
-        res
-    ) => {
-
-        if (
-            !req.file
-        ) {
-
-            return res.status(
-                400
-            ).json({
-
-                error:
-                    "No video uploaded."
-
-            });
-        }
-
-
-        const framesDir =
-            path.join(
-                uploadsDir,
-                `frames_${Date.now()}`
-            );
-
-
-        try {
-
-            if (
-                !ffmpegPath
-            ) {
-
-                throw new Error(
-                    "FFmpeg is unavailable on this server."
-                );
-            }
-
-
-            fs.mkdirSync(
-                framesDir,
-                {
-                    recursive:
-                        true
-                }
-            );
-
-
-            await extractVideoFrames(
-                req.file.path,
-                framesDir
-            );
-
-
-            const frameFiles =
-                fs
-
-                    .readdirSync(
-                        framesDir
-                    )
-
-                    .filter(
-                        file =>
-                            /\.(png|jpg|jpeg)$/i
-                                .test(
-                                    file
-                                )
-                    )
-
-                    .sort();
-
-
-            if (
-                frameFiles.length ===
-                0
-            ) {
-
-                throw new Error(
-                    "No readable video frames were extracted."
-                );
-            }
-
-
-            const lines = [];
-
-
-            let confidenceTotal =
-                0;
-
-
-            let confidenceCount =
-                0;
-
-
-            for (
-                let i = 0;
-                i < frameFiles.length;
-                i++
-            ) {
-
-                const frame =
-                    frameFiles[i];
-
-
-                try {
-
-                    const ocr =
-                        await performGoogleOCR(
-                            path.join(
-                                framesDir,
-                                frame
-                            )
-                        );
-
-
-                    if (
-                        ocr.text
-                    ) {
-
-                        const frameLines =
-                            ocr.text
-
-                                .split(
-                                    /\n+/
-                                )
-
-                                .map(
-                                    normalizeVideoLine
-                                )
-
-                                .filter(
-                                    Boolean
-                                );
-
-
-                        lines.push(
-                            ...frameLines
-                        );
-                    }
-
-
-                    if (
-                        Number.isFinite(
-                            ocr.ocrConfidence
-                        )
-                    ) {
-
-                        confidenceTotal +=
-                            ocr.ocrConfidence;
-
-                        confidenceCount++;
-                    }
-
-                } catch (
-                    error
-                ) {
-
-                    console.error(
-                        `Video frame ${i + 1} OCR failed:`,
-                        error.message
-                    );
-                }
-            }
-
-
-            const uniqueLines =
-                [];
-
-
-            const seen =
-                new Set();
-
-
-            lines.forEach(
-                line => {
-
-                    const key =
-                        normalizeText(
-                            line
-                        );
-
-
-                    if (
-                        !key ||
-                        key.length <
-                        2
-                    ) {
-
-                        return;
-                    }
-
-
-                    if (
-                        seen.has(
-                            key
-                        )
-                    ) {
-
-                        return;
-                    }
-
-
-                    const nearDuplicate =
-                        uniqueLines.some(
-                            existing =>
-                                existing ===
-                                key ||
-
-                                existing.includes(
-                                    key
-                                ) ||
-
-                                key.includes(
-                                    existing
-                                )
-                        );
-
-
-                    if (
-                        nearDuplicate
-                    ) {
-
-                        return;
-                    }
-
-
-                    seen.add(
-                        key
-                    );
-
-
-                    uniqueLines.push(
-                        key
-                    );
-                }
-            );
-
-
-            const combinedText =
-                cleanText(
-                    uniqueLines.join(
-                        "\n"
-                    )
-                );
-
-
-            if (
-                !combinedText
-            ) {
-
-                throw new Error(
-                    "No readable text was found in the selected video frames."
-                );
-            }
-
-
-            const analysis =
-                analyzeText(
-                    combinedText
-                );
-
-
-            const averageConfidence =
-                confidenceCount >
-                0
-
-                    ? Math.round(
-                        confidenceTotal /
-                        confidenceCount
-                    )
-
-                    : 0;
-
-
-            return res.json({
-
-                ...analysis,
-
-                text:
-                    combinedText,
-
-                highlightedWords:
-                    getHighlightedWordsFromText(
-                        combinedText
-                    ),
-
-                ocrConfidence:
-                    averageConfidence,
-
-                framesScanned:
-                    frameFiles.length,
-
-                contentType:
-                    "video"
-
-            });
-
-        } catch (
-            error
-        ) {
-
-            console.error(
-                "VIDEO OCR ERROR:",
-                error
-            );
-
-
-            return res.status(
-                500
-            ).json({
-
-                error:
-                    error.message ||
-                    "Unable to process the video."
-
-            });
-
-        } finally {
-
-            safeDelete(
-                req.file.path
-            );
-
-
-            fs.rm(
-                framesDir,
-                {
-                    recursive:
-                        true,
-
-                    force:
-                        true
-                },
-                () => {}
-            );
-        }
+/* OCR for scanned PDFs (first pages only) using Google Vision. */
+async function ocrPdfWithVision(buffer, pages) {
+    if (!visionClient) {
+        return "";
     }
-);
-
+    const pageList = Array.from({ length: Math.max(1, pages) }, (_, i) => i + 1);
+    const [response] = await visionClient.batchAnnotateFiles({
+        requests: [{
+            inputConfig: {
+                content: buffer,
+                mimeType: "application/pdf"
+            },
+            features: [{ type: "DOCUMENT_TEXT_DETECTION" }],
+            pages: pageList
+        }]
+    });
+    const responses = response?.responses?.[0]?.responses || [];
+    return responses
+        .map(item => item.fullTextAnnotation?.text || "")
+        .filter(Boolean)
+        .join("\n\n");
+}
 
 /* =========================================================
    POST /analyze-file
@@ -2500,192 +2053,150 @@ app.post(
 
 app.post(
     "/analyze-file",
+    fileUpload.single("file"),
+    async (req, res) => {
 
-    fileUpload.single(
-        "file"
-    ),
-
-    async (
-        req,
-        res
-    ) => {
-
-        if (
-            !req.file
-        ) {
-
-            return res.status(
-                400
-            ).json({
-
-                error:
-                    "No file uploaded."
-
-            });
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded." });
         }
 
-
-        const ext =
-            path.extname(
-                req.file.originalname ||
-                ""
-            ).toLowerCase();
-
+        const ext = path.extname(req.file.originalname || "").toLowerCase();
 
         try {
 
-            let extractedText =
-                "";
+            let extractedText = "";
+            let ocrUsed = false;
+            let pageCount = null;
+            let ocrPages = 0;
 
+            if (ext === ".txt") {
 
-            /* =================================================
-               TXT
-            ================================================== */
+                extractedText = cleanText(
+                    decodeTextBuffer(fs.readFileSync(req.file.path))
+                );
 
-            if (
-                ext ===
-                ".txt"
-            ) {
+            } else if (ext === ".pdf") {
 
-                extractedText =
-                    fs.readFileSync(
-                        req.file.path,
-                        "utf8"
+                const buffer = fs.readFileSync(req.file.path);
+
+                let data;
+
+                try {
+                    data = await pdfParse(buffer, { max: MAX_PDF_PAGES });
+                } catch (pdfError) {
+                    console.error("PDF PARSE ERROR:", pdfError.message);
+                    throw new Error(
+                        "This PDF could not be opened. It may be password-protected or damaged."
                     );
-            }
+                }
 
+                pageCount = data.numpages || null;
 
-            /* =================================================
-               PDF
-            ================================================== */
+                extractedText = reflowExtractedText(data.text || "");
 
-            else if (
-                ext ===
-                ".pdf"
-            ) {
-
-                const buffer =
-                    fs.readFileSync(
-                        req.file.path
-                    );
-
-
-                const data =
-                    await pdfParse(
-                        buffer
-                    );
-
-
-                extractedText =
-                    data.text ||
-                    "";
-            }
-
-
-            /* =================================================
-               DOCX
-            ================================================== */
-
-            else if (
-                ext ===
-                ".docx"
-            ) {
-
-                const result =
-                    await mammoth.extractRawText({
-
-                        path:
-                            req.file.path
-
-                    });
-
-
-                extractedText =
-                    result.value ||
-                    "";
-            }
-
-
-            /* =================================================
-               UNSUPPORTED
-            ================================================== */
-
-            else {
-
-                throw new Error(
-                    "Unsupported file type. Use TXT, PDF, or DOCX."
-                );
-            }
-
-
-            extractedText =
-                cleanText(
-                    extractedText
+                const pagesRead = Math.max(
+                    1,
+                    Math.min(pageCount || 1, MAX_PDF_PAGES)
                 );
 
+                const looksScanned =
+                    extractedText.replace(/\s/g, "").length < 40 * pagesRead;
 
-            if (
-                !extractedText
-            ) {
+                if (looksScanned) {
 
-                throw new Error(
-                    "No readable text was found in this file."
-                );
+                    if (!visionClient) {
+
+                        if (!extractedText) {
+                            throw new Error(
+                                "This PDF looks scanned (it only contains images) and OCR is not available right now. Upload photos of the pages instead."
+                            );
+                        }
+
+                    } else {
+
+                        try {
+
+                            ocrPages = Math.min(
+                                pageCount || 1,
+                                MAX_PDF_OCR_PAGES
+                            );
+
+                            const ocrText = reflowExtractedText(
+                                await ocrPdfWithVision(buffer, ocrPages)
+                            );
+
+                            if (ocrText.length > extractedText.length) {
+                                extractedText = ocrText;
+                                ocrUsed = true;
+                            }
+
+                        } catch (ocrError) {
+
+                            console.error("PDF OCR ERROR:", ocrError.message);
+
+                            if (!extractedText) {
+                                throw new Error(
+                                    "This PDF looks scanned and could not be read with OCR. Try uploading photos of the pages instead."
+                                );
+                            }
+                        }
+                    }
+                }
+
+            } else if (ext === ".docx") {
+
+                const result = await mammoth.extractRawText({
+                    path: req.file.path
+                });
+
+                extractedText = cleanText(result.value || "");
+
+            } else {
+
+                throw new Error("Unsupported file type. Use TXT, PDF, or DOCX.");
             }
 
+            extractedText = cleanText(extractedText);
 
-            const analysis =
-                analyzeText(
-                    extractedText
-                );
+            if (!extractedText) {
+                throw new Error("No readable text was found in this file.");
+            }
 
+            const truncated =
+                extractedText.length > MAX_TEXT_CHARS ||
+                (pageCount !== null && pageCount > MAX_PDF_PAGES);
+
+            if (extractedText.length > MAX_TEXT_CHARS) {
+                extractedText = extractedText.slice(0, MAX_TEXT_CHARS);
+            }
+
+            const analysis = analyzeText(extractedText);
 
             return res.json({
-
                 ...analysis,
-
-                text:
-                    extractedText,
-
-                highlightedWords:
-                    getHighlightedWordsFromText(
-                        extractedText
-                    ),
-
-                contentType:
-                    "file"
-
+                text: extractedText,
+                highlightedWords: getHighlightedWordsFromText(extractedText),
+                contentType: "file",
+                ocrUsed,
+                ocrPages,
+                pageCount,
+                truncated
             });
 
-        } catch (
-            error
-        ) {
+        } catch (error) {
 
-            console.error(
-                "FILE ANALYSIS ERROR:",
-                error
-            );
+            console.error("FILE ANALYSIS ERROR:", error);
 
-
-            return res.status(
-                500
-            ).json({
-
-                error:
-                    error.message ||
-                    "Unable to read this file."
-
+            return res.status(500).json({
+                error: error.message || "Unable to read this file."
             });
 
         } finally {
 
-            safeDelete(
-                req.file.path
-            );
+            safeDelete(req.file.path);
         }
     }
 );
-
 
 /* =========================================================
    HEALTH CHECK
@@ -2713,11 +2224,6 @@ app.get(
             visionConfigured:
                 Boolean(
                     visionClient
-                ),
-
-            ffmpegConfigured:
-                Boolean(
-                    ffmpegPath
                 )
 
         });
@@ -2803,13 +2309,24 @@ app.use(
         }
 
 
-        return res.status(
-            status
-        ).json({
+        const message =
 
-            error:
-                err.message ||
-                "Server error."
+
+            err.code === "LIMIT_FILE_SIZE"
+
+
+                ? "That file is too large. Photos can be up to 10 MB and documents up to 20 MB."
+
+
+                : (err.message || "Server error.");
+
+
+        
+
+
+        return res.status(status).json({
+
+            error: message
 
         });
     }

@@ -379,75 +379,6 @@
     </section>
 
     <!-- =================================================
-         VIDEO PREVIEW
-    ================================================== -->
-
-    <section
-        id="videoContainer"
-        class="preview-card hidden">
-
-        <div class="preview-header">
-
-            <div>
-
-                <span class="section-eyebrow">
-                    VIDEO
-                </span>
-
-                <h3>Uploaded Video</h3>
-
-            </div>
-
-            <button
-                class="small-action"
-                onclick="removeCurrentMedia()">
-
-                Remove
-
-            </button>
-
-        </div>
-
-        <div class="video-wrapper">
-
-            <video
-                id="previewVideo"
-                controls
-                playsinline>
-            </video>
-
-        </div>
-
-        <div
-            id="videoProgress"
-            class="progress-area hidden">
-
-            <div class="progress-label">
-
-                <span id="videoProgressText">
-                    Scanning video...
-                </span>
-
-                <strong id="videoProgressPercent">
-                    0%
-                </strong>
-
-            </div>
-
-            <div class="progress-track">
-
-                <div
-                    id="videoProgressBar"
-                    class="progress-fill">
-                </div>
-
-            </div>
-
-        </div>
-
-    </section>
-
-    <!-- =================================================
          FILE PREVIEW
     ================================================== -->
 
@@ -937,20 +868,6 @@
 
     </button>
 
-    <button onclick="openVideoPicker()">
-
-        <span class="menu-icon"></span>
-
-        <span>
-
-            <strong>Videos</strong>
-
-            <small>Scan video frames</small>
-
-        </span>
-
-    </button>
-
     <button onclick="openFilePicker()">
 
         <span class="menu-icon"></span>
@@ -982,12 +899,6 @@
     type="file"
     id="photo"
     accept="image/*"
-    hidden>
-
-<input
-    type="file"
-    id="video"
-    accept="video/*"
     hidden>
 
 <input
